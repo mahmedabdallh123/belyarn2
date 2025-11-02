@@ -25,11 +25,11 @@ SESSION_DURATION = timedelta(minutes=15)  # مدة الجلسة 10 دقائق
 MAX_ACTIVE_USERS = 2  # أقصى عدد مستخدمين مسموح
 
 # إعدادات GitHub (مسارات الملف والريبو)
-REPO_NAME = "mahmedabdallh123/BELYARN"  # عدل إذا لزم
+REPO_NAME = "mahmedabdallh123/belyarn2"  # عدل إذا لزم
 BRANCH = "main"
-FILE_PATH = "Machine_Service_Lookup.xlsx"
-LOCAL_FILE = "Machine_Service_Lookup.xlsx"
-GITHUB_EXCEL_URL = "https://github.com/mahmedabdallh123/BELYARN/raw/refs/heads/main/Machine_Service_Lookup.xlsx"
+FILE_PATH = "bel2.xlsx"
+LOCAL_FILE = "bel2.xlsx"
+GITHUB_EXCEL_URL = "https://github.com/mahmedabdallh123/belyarn2/raw/refs/heads/main/bel2.xlsx"
 
 # -------------------------------
 # 🧩 دوال مساعدة للملفات والحالة
