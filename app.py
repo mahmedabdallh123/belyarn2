@@ -38,7 +38,7 @@ def load_users():
     """تحميل بيانات المستخدمين من ملف JSON"""
     if not os.path.exists(USERS_FILE):
         # انشئ ملف افتراضي اذا مش موجود (يوجد admin بكلمة مرور افتراضية "admin" — غيرها فورًا)
-        default = {"admin": {"password": "admin", "role": "admin", "created_at": datetime.now().isoformat()}}
+        default = {"saad": {"password": "saad", "role": "saad", "created_at": datetime.now().isoformat()}}
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(default, f, indent=4, ensure_ascii=False)
         return default
@@ -47,7 +47,7 @@ def load_users():
             return json.load(f)
     except Exception as e:
         st.error(f"❌ خطأ في ملف users.json: {e}")
-        return {"admin": {"password": "admin", "role": "admin", "created_at": datetime.now().isoformat()}}
+        return {"saad": {"password": "saad", "role": "saad", "created_at": datetime.now().isoformat()}}
 
 def save_users(users):
     """حفظ بيانات المستخدمين إلى ملف JSON"""
