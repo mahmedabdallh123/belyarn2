@@ -830,6 +830,65 @@ with tabs[0]:
         with col2:
             current_tons = st.number_input("عدد الأطنان الحالية:", min_value=0, step=100, key="current_tons_main")
 
+        # قسم العداد المنفصل - محدث
+        st.markdown("---")
+        st.subheader("🔢 عداد الإنتاج الحالي")
+        
+        card_sheet_name = f"Card{card_num}"
+        if card_sheet_name in all_sheets:
+            card_df = all_sheets[card_sheet_name]
+            
+            # البحث عن آخر قيمة لـ Current Tons
+            current_counter_value = 0
+            if "Current Tons" in card_df.columns:
+                tons_series = pd.to_numeric(card_df["Current Tons"], errors='coerce')
+                tons_series = tons_series.dropna()
+                if not tons_series.empty:
+                    current_counter_value = tons_series.iloc[-1]
+            
+            # عرض العداد بشكل مميز
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 20px; border-radius: 10px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 18px;">العداد الحالي</h3>
+                <h1 style="margin: 10px 0; font-size: 48px; font-weight: bold;">{current_counter_value:,.2f}</h1>
+                <p style="margin: 0; font-size: 16px;">طن</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # معلومات إضافية
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(
+                    label="بالكيلوجرام",
+                    value=f"{(current_counter_value * 1000):,.0f}",
+                    help="إجمالي الكيلوجرامات المنتجة"
+                )
+            with col2:
+                # حساب نسبة الإنتاج (افتراضي أن السعة القصوى 5000 طن)
+                max_capacity = 5000
+                production_percentage = (current_counter_value / max_capacity) * 100 if max_capacity > 0 else 0
+                st.metric(
+                    label="نسبة الإنتاج",
+                    value=f"{production_percentage:.1f}%",
+                    delta=f"من {max_capacity} طن"
+                )
+            with col3:
+                st.metric(
+                    label="الحالة",
+                    value="🟢 نشط" if current_counter_value > 0 else "⚪ متوقف",
+                    help="حالة الماكينة بناءً على الإنتاج"
+                )
+            
+            # شريط تقدم للإنتاج
+            st.progress(production_percentage / 100)
+            
+            # ملاحظة مهمة
+            st.info("💡 *ملاحظة:* العداد يبدأ من قيمة الإنتاج الإضافي التي تدخلها في تبويب 'عداد السرعة والإنتاج'")
+            
+        else:
+            st.info("⚠ لم يتم العثور على بيانات لهذه الماكينة")
+
         if st.button("عرض الحالة"):
             st.session_state["show_results"] = True
 
@@ -1058,7 +1117,7 @@ if permissions["can_edit"] and len(tabs) > 1:
                             st.error(f"حدث خطأ أثناء الحذف: {e}")
 
             # -------------------------------
-            # Tab 5: عداد السرعة والإنتاج - التبويب الجديد
+            # Tab 5: عداد السرعة والإنتاج - التبويب الجديد المحسن
             # -------------------------------
             with tab5:
                 st.header("⚡ عداد السرعة والإنتاج الفعلي")
@@ -1100,6 +1159,49 @@ if permissions["can_edit"] and len(tabs) > 1:
                         
                         st.info(f"*عدد الأطنان الحالي للماكينة: {current_tons_value} طن*")
                         
+                        # قسم تعيين قيمة البدء
+                        st.subheader("🎯 تعيين قيمة بداية العد")
+                        st.markdown("*أدخل القيمة التي تريد أن يبدأ منها العداد:*")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            start_count_value = st.number_input(
+                                "قيمة بداية العد (طن):",
+                                min_value=0.0,
+                                value=current_tons_value,
+                                step=10.0,
+                                help="القيمة التي سيبدأ منها العداد الجديد"
+                            )
+                        
+                        with col2:
+                            if st.button("🚀 تعيين قيمة البدء", type="primary"):
+                                updated_df = card_df.copy()
+                                if "Current Tons" in updated_df.columns:
+                                    # تحديث آخر صف به قيمة
+                                    tons_mask = pd.to_numeric(updated_df["Current Tons"], errors='coerce').notna()
+                                    if tons_mask.any():
+                                        last_idx = tons_mask[tons_mask].index[-1]
+                                        updated_df.at[last_idx, "Current Tons"] = start_count_value
+                                    else:
+                                        # إذا لم توجد أي قيم، نضيف صفاً جديداً
+                                        new_row = {"Current Tons": start_count_value}
+                                        for col in updated_df.columns:
+                                            if col != "Current Tons":
+                                                new_row[col] = ""
+                                        new_row_df = pd.DataFrame([new_row])
+                                        updated_df = pd.concat([updated_df, new_row_df], ignore_index=True)
+                                
+                                sheets_edit[selected_card] = updated_df.astype(object)
+                                
+                                # حفظ تلقائي في GitHub
+                                new_sheets = auto_save_to_github(
+                                    sheets_edit,
+                                    f"تعيين بداية العد لـ {selected_card}: {start_count_value} طن"
+                                )
+                                if new_sheets is not None:
+                                    sheets_edit = new_sheets
+                                    st.rerun()
+                        
                         # إدخال بيانات الإنتاج
                         st.subheader("🔄 تحديث الإنتاج")
                         col1, col2, col3 = st.columns(3)
@@ -1116,27 +1218,42 @@ if permissions["can_edit"] and len(tabs) > 1:
                         
                         with col2:
                             machine_speed = st.number_input(
-                                "سرعة الماكينة (طن/ساعة):",
+                                "سرعة الماكينة (كجم/ساعة):",
                                 min_value=0.0,
                                 value=85.0,
                                 step=1.0,
-                                help="سرعة إنتاج الماكينة بالطن في الساعة"
+                                help="سرعة إنتاج الماكينة بالكيلوجرام في الساعة"
                             )
                         
                         with col3:
                             additional_production = st.number_input(
-                                "إنتاج إضافي (طن):",
+                                "إنتاج إضافي (طن):",  # تغيير إلى طن
                                 min_value=0.0,
                                 value=0.0,
                                 step=10.0,
-                                help="أي إنتاج إضافي غير محسوب بالسرعة"
+                                help="الإنتاج الإضافي الذي سيبدأ منه العداد (بالطن)"
                             )
                         
                         # حساب الإنتاج الجديد
-                        new_production = (operating_hours * machine_speed) + additional_production
-                        new_total_tons = current_tons_value + new_production
+                        # تحويل سرعة الماكينة من كجم/ساعة إلى طن/ساعة
+                        machine_speed_tons = machine_speed / 1000  # 1 طن = 1000 كجم
                         
-                        st.success(f"*الإنتاج المضاف: {new_production:.2f} طن*")
+                        # إنتاج السرعة بالطن
+                        production_from_speed = operating_hours * machine_speed_tons
+                        
+                        # الإنتاج الإضافي (بالطن)
+                        total_additional = additional_production
+                        
+                        # الإنتاج الكلي المضاف
+                        total_new_production = production_from_speed + total_additional
+                        
+                        # القيمة الجديدة للعداد (تبدأ من الإنتاج الإضافي + إنتاج السرعة)
+                        new_total_tons = total_additional + production_from_speed
+                        
+                        # عرض النتائج
+                        st.success(f"*الإنتاج من السرعة: {production_from_speed:.2f} طن*")
+                        st.success(f"*الإنتاج الإضافي (بداية العد): {total_additional:.2f} طن*")
+                        st.success(f"*إجمالي الإنتاج المضاف: {total_new_production:.2f} طن*")
                         st.success(f"*إجمالي الأطنان الجديد: {new_total_tons:.2f} طن*")
                         
                         # خيارات التحديث
@@ -1157,18 +1274,17 @@ if permissions["can_edit"] and len(tabs) > 1:
                                 new_row = {}
                                 
                                 # نسخ بيانات الأعمدة الأساسية
-                                base_columns = ["Min_Tones", "Max_Tones", "Service", "Tones", "Date"]
                                 for col in card_df.columns:
-                                    if col in base_columns:
+                                    if col in ["Min_Tones", "Max_Tones", "Service", "Tones", "Date"]:
                                         new_row[col] = ""
                                     elif col == "Current Tons":
                                         new_row[col] = new_total_tons
                                     elif col == "Tones":
-                                        new_row[col] = f"+{new_production:.2f}"
+                                        new_row[col] = f"+{total_new_production:.2f} طن"
                                     elif col == "Date":
                                         new_row[col] = datetime.now().strftime("%Y-%m-%d %H:%M")
                                     elif col == "Event":
-                                        new_row[col] = f"تحديث إنتاجي: {operating_hours}h @ {machine_speed}t/h"
+                                        new_row[col] = f"تحديث إنتاجي: {operating_hours}h @ {machine_speed}kg/h + {additional_production}طن بداية"
                                     else:
                                         new_row[col] = ""
                                 
@@ -1198,216 +1314,8 @@ if permissions["can_edit"] and len(tabs) > 1:
                             # حفظ تلقائي في GitHub
                             new_sheets = auto_save_to_github(
                                 sheets_edit,
-                                f"تحديث إنتاج {selected_card}: {new_production:.2f} طن → {new_total_tons:.2f} طن"
+                                f"تحديث إنتاج {selected_card}: بداية {additional_production}طن + {production_from_speed:.2f}طن سرعة → {new_total_tons:.2f}طن"
                             )
                             if new_sheets is not None:
                                 sheets_edit = new_sheets
                                 st.rerun()
-                        
-                        # عرض سجل الإنتاج - معدل للتحقق من وجود الأعمدة
-                        st.subheader("📈 سجل الإنتاج")
-                        if "Current Tons" in card_df.columns:
-                            # تحديد الأعمدة المتاحة لعرضها
-                            available_columns = []
-                            for col in ["Date", "Tones", "Current Tons", "Event"]:
-                                if col in card_df.columns:
-                                    available_columns.append(col)
-                            
-                            if available_columns:
-                                production_history = card_df[available_columns].copy()
-                                production_history = production_history.dropna(subset=["Current Tons"])
-                                production_history["Current Tons"] = pd.to_numeric(production_history["Current Tons"], errors='coerce')
-                                production_history = production_history.dropna(subset=["Current Tons"])
-                                
-                                if not production_history.empty:
-                                    st.dataframe(
-                                        production_history.sort_values("Current Tons", ascending=False),
-                                        use_container_width=True
-                                    )
-                                    
-                                    # رسم بياني مبسط للتطور
-                                    try:
-                                        chart_data = production_history[["Current Tons"]].copy()
-                                        
-                                        # إذا كان عمود التاريخ متاحاً، استخدمه كمؤشر
-                                        if "Date" in production_history.columns:
-                                            chart_data["Date"] = pd.to_datetime(production_history["Date"], errors='coerce')
-                                            chart_data = chart_data.dropna(subset=["Date"])
-                                            chart_data = chart_data.sort_values("Date")
-                                            if not chart_data.empty:
-                                                st.line_chart(
-                                                    chart_data.set_index("Date")["Current Tons"],
-                                                    use_container_width=True
-                                                )
-                                        else:
-                                            # إذا لم يكن هناك تاريخ، استخدم الفهرس
-                                            chart_data.index = range(len(chart_data))
-                                            st.line_chart(
-                                                chart_data["Current Tons"],
-                                                use_container_width=True
-                                            )
-                                    except Exception as e:
-                                        st.warning(f"⚠ لا يمكن عرض الرسم البياني: {e}")
-                                else:
-                                    st.info("لا توجد بيانات سابقة للإنتاج.")
-                            else:
-                                st.info("لا توجد أعمدة متاحة لعرض سجل الإنتاج.")
-                        else:
-                            st.info("لا يوجد عمود 'Current Tons' في شيت الماكينة.")
-
-# -------------------------------
-# Tab: إدارة المستخدمين - للمسؤول فقط
-# -------------------------------
-if permissions["can_manage_users"] and len(tabs) > 2:
-    with tabs[2]:
-        st.header("👥 إدارة المستخدمين")
-        
-        users = load_users()
-        
-        # عرض المستخدمين الحاليين
-        st.subheader("📋 المستخدمين الحاليين")
-        
-        if users:
-            # تحويل بيانات المستخدمين إلى DataFrame لعرضها
-            user_data = []
-            for username, info in users.items():
-                user_data.append({
-                    "اسم المستخدم": username,
-                    "الدور": info.get("role", "user"),
-                    "الصلاحيات": ", ".join(info.get("permissions", [])),
-                    "تاريخ الإنشاء": info.get("created_at", "غير معروف")
-                })
-            
-            users_df = pd.DataFrame(user_data)
-            st.dataframe(users_df, use_container_width=True)
-        else:
-            st.info("لا يوجد مستخدمين مسجلين بعد.")
-        
-        # إضافة مستخدم جديد
-        st.subheader("➕ إضافة مستخدم جديد")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            new_username = st.text_input("اسم المستخدم الجديد:")
-        with col2:
-            new_password = st.text_input("كلمة المرور:", type="password")
-        with col3:
-            user_role = st.selectbox("الدور:", ["admin", "editor", "viewer"])
-        
-        if st.button("إضافة مستخدم", key="add_user"):
-            if not new_username.strip() or not new_password.strip():
-                st.warning("⚠ الرجاء إدخال اسم المستخدم وكلمة المرور.")
-            elif new_username in users:
-                st.warning("⚠ هذا المستخدم موجود بالفعل.")
-            else:
-                # تحديد الصلاحيات بناءً على الدور
-                if user_role == "admin":
-                    permissions_list = ["all"]
-                elif user_role == "editor":
-                    permissions_list = ["view", "edit"]
-                else:  # viewer
-                    permissions_list = ["view"]
-                
-                users[new_username] = {
-                    "password": new_password,
-                    "role": user_role,
-                    "permissions": permissions_list,
-                    "created_at": datetime.now().isoformat()
-                }
-                if save_users(users):
-                    st.success(f"✅ تم إضافة المستخدم '{new_username}' بنجاح.")
-                    st.rerun()
-                else:
-                    st.error("❌ حدث خطأ أثناء حفظ بيانات المستخدم.")
-        
-        # حذف مستخدم
-        st.subheader("🗑 حذف مستخدم")
-        
-        if len(users) > 1:  # لا يمكن حذف جميع المستخدمين
-            user_to_delete = st.selectbox(
-                "اختر مستخدم للحذف:",
-                [u for u in users.keys() if u != "admin"],  # لا يمكن حذف admin
-                key="delete_user_select"
-            )
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                confirm_delete = st.checkbox("✅ تأكيد الحذف", key="confirm_user_delete")
-            with col2:
-                if st.button("حذف المستخدم", key="delete_user_btn"):
-                    if not confirm_delete:
-                        st.warning("⚠ يرجى تأكيد الحذف أولاً.")
-                    elif user_to_delete == "admin":
-                        st.error("❌ لا يمكن حذف المستخدم admin.")
-                    elif user_to_delete == st.session_state.get("username"):
-                        st.error("❌ لا يمكن حذف حسابك أثناء تسجيل الدخول.")
-                    else:
-                        if user_to_delete in users:
-                            del users[user_to_delete]
-                            if save_users(users):
-                                st.success(f"✅ تم حذف المستخدم '{user_to_delete}' بنجاح.")
-                                st.rerun()
-                            else:
-                                st.error("❌ حدث خطأ أثناء حفظ التغييرات.")
-        else:
-            st.info("لا يمكن حذف جميع المستخدمين. يجب أن يبقى مستخدم واحد على الأقل.")
-        
-        # إعادة تعيين كلمة المرور
-        st.subheader("🔑 إعادة تعيين كلمة المرور")
-        
-        if len(users) > 0:
-            user_to_reset = st.selectbox(
-                "اختر مستخدم لإعادة تعيين كلمة المرور:",
-                list(users.keys()),
-                key="reset_user_select"
-            )
-            
-            new_password_reset = st.text_input("كلمة المرور الجديدة:", type="password", key="new_password_reset")
-            
-            if st.button("إعادة تعيين كلمة المرور", key="reset_password_btn"):
-                if not new_password_reset.strip():
-                    st.warning("⚠ الرجاء إدخال كلمة المرور الجديدة.")
-                else:
-                    users[user_to_reset]["password"] = new_password_reset
-                    if save_users(users):
-                        st.success(f"✅ تم إعادة تعيين كلمة المرور للمستخدم '{user_to_reset}' بنجاح.")
-                        st.rerun()
-                    else:
-                        st.error("❌ حدث خطأ أثناء حفظ التغييرات.")
-
-# -------------------------------
-# Tab: الدعم الفني - للمسؤول فقط أو إذا كان مسموحاً للجميع
-# -------------------------------
-tech_support_tab_index = 3 if permissions["can_manage_users"] else (
-    2 if permissions["can_edit"] and not permissions["can_manage_users"] else 1
-)
-
-if ((permissions["can_manage_users"] and len(tabs) > 3) or 
-    (permissions["can_see_tech_support"] and len(tabs) > tech_support_tab_index)):
-    
-    with tabs[tech_support_tab_index]:
-        st.header("📞 الدعم الفني")
-        
-        st.markdown("## 🛠 معلومات التطوير والدعم")
-        st.markdown("تم تطوير هذا التطبيق بواسطة:")
-        st.markdown("### م. محمد عبدالله")
-        st.markdown("### رئيس قسم الكرد والمحطات")
-        st.markdown("### مصنع بيل يارن للغزل")
-        st.markdown("---")
-        st.markdown("### معلومات الاتصال:")
-        st.markdown("- 📧 البريد الإلكتروني: medotatch124@gmail.com")
-        st.markdown("- 📞 هاتف: 01274424062")
-        st.markdown("- 🏢 الموقع: مصنع بيل يارن للغزل")
-        st.markdown("---")
-        st.markdown("### خدمات الدعم الفني:")
-        st.markdown("- 🔧 صيانة وتحديث النظام")
-        st.markdown("- 📊 تطوير تقارير إضافية")
-        st.markdown("- 🐛 إصلاح الأخطاء والمشكلات")
-        st.markdown("- 💡 استشارات فنية وتقنية")
-        st.markdown("---")
-        st.markdown("### إصدار النظام:")
-        st.markdown("- الإصدار: 1.0")
-        st.markdown("- آخر تحديث: 2025")
-        st.markdown("- النظام: نظام سيرفيس كرد ترتشلر")
-        
-        st.info("ملاحظة: في حالة مواجهة أي مشاكل تقنية أو تحتاج إلى إضافة ميزات جديدة، يرجى التواصل مع قسم الدعم الفني.")
