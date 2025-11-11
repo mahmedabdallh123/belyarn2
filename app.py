@@ -21,26 +21,26 @@ except Exception:
 # ===============================
 APP_CONFIG = {
     # إعدادات التطبيق العامة
-    "APP_TITLE": "CMMS - Bail Yarn2",
+    "APP_TITLE": "CMMS - BELYARN2",
     "APP_ICON": "🏭",
     
     # إعدادات GitHub
-    "REPO_NAME": "mahmedabdallh123/belyarn2",  # غيّر هذا لريبو الجديد
+    "REPO_NAME": "mahmedabdallh123/belyarn2",
     "BRANCH": "main",
-    "FILE_PATH": "bel2.xlsx",  # غيّر هذا لملف Excel الجديد
-    "LOCAL_FILE": "bel2.xlsx",  # غيّر هذا للملف المحلي الجديد
+    "FILE_PATH": "bel2.xlsx",
+    "LOCAL_FILE": "bel2.xlsx",
     
     # إعدادات الأمان
     "MAX_ACTIVE_USERS": 2,
     "SESSION_DURATION_MINUTES": 15,
     
     # إعدادات الواجهة
-    "SHOW_TECH_SUPPORT_TO_ALL": False,  # True = الكل يشوف الدعم الفني, False = فقط admin
+    "SHOW_TECH_SUPPORT_TO_ALL": False,
     "CUSTOM_TABS": ["📊 عرض وفحص الماكينات", "🛠 تعديل وإدارة البيانات", "👥 إدارة المستخدمين", "📞 الدعم الفني"]
 }
 
 # ===============================
-# 🗂 إعدادات الملفات (لا تحتاج للتعديل)
+# 🗂 إعدادات الملفات
 # ===============================
 USERS_FILE = "users.json"
 STATE_FILE = "state.json"
@@ -56,17 +56,68 @@ GITHUB_EXCEL_URL = f"https://github.com/{APP_CONFIG['REPO_NAME'].split('/')[0]}/
 def load_users():
     """تحميل بيانات المستخدمين من ملف JSON"""
     if not os.path.exists(USERS_FILE):
-        # انشئ ملف افتراضي اذا مش موجود (يوجد admin بكلمة مرور افتراضية "admin" — غيرها فورًا)
-        default = {"admin": {"password": "admin", "role": "admin", "created_at": datetime.now().isoformat()}}
+        # إنشاء مستخدمين افتراضيين مع الصلاحيات المطلوبة
+        default_users = {
+            "admin": {
+                "password": "admin123", 
+                "role": "admin", 
+                "created_at": datetime.now().isoformat(),
+                "permissions": ["all"]
+            },
+            "user1": {
+                "password": "user1123", 
+                "role": "editor", 
+                "created_at": datetime.now().isoformat(),
+                "permissions": ["view", "edit"]
+            },
+            "user2": {
+                "password": "user2123", 
+                "role": "viewer", 
+                "created_at": datetime.now().isoformat(),
+                "permissions": ["view"]
+            }
+        }
         with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(default, f, indent=4, ensure_ascii=False)
-        return default
+            json.dump(default_users, f, indent=4, ensure_ascii=False)
+        return default_users
     try:
         with open(USERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            users = json.load(f)
+            # التأكد من وجود جميع الحقول المطلوبة لكل مستخدم
+            for username, user_data in users.items():
+                if "role" not in user_data:
+                    # تحديد الدور بناءً على اسم المستخدم إذا لم يكن موجوداً
+                    if username == "admin":
+                        user_data["role"] = "admin"
+                        user_data["permissions"] = ["all"]
+                    else:
+                        user_data["role"] = "viewer"
+                        user_data["permissions"] = ["view"]
+                
+                if "permissions" not in user_data:
+                    # تعيين الصلاحيات الافتراضية بناءً على الدور
+                    if user_data["role"] == "admin":
+                        user_data["permissions"] = ["all"]
+                    elif user_data["role"] == "editor":
+                        user_data["permissions"] = ["view", "edit"]
+                    else:
+                        user_data["permissions"] = ["view"]
+                        
+                if "created_at" not in user_data:
+                    user_data["created_at"] = datetime.now().isoformat()
+                    
+            return users
     except Exception as e:
         st.error(f"❌ خطأ في ملف users.json: {e}")
-        return {"admin": {"password": "admin", "role": "admin", "created_at": datetime.now().isoformat()}}
+        # إرجاع المستخدمين الافتراضيين في حالة الخطأ
+        return {
+            "admin": {
+                "password": "admin123", 
+                "role": "admin", 
+                "created_at": datetime.now().isoformat(),
+                "permissions": ["all"]
+            }
+        }
 
 def save_users(users):
     """حفظ بيانات المستخدمين إلى ملف JSON"""
@@ -136,7 +187,6 @@ def logout_action():
         state[username]["active"] = False
         state[username].pop("login_time", None)
         save_state(state)
-    # احذف متغيرات الجلسة
     keys = list(st.session_state.keys())
     for k in keys:
         st.session_state.pop(k, None)
@@ -151,6 +201,8 @@ def login_ui():
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
         st.session_state.username = None
+        st.session_state.user_role = None
+        st.session_state.user_permissions = []
 
     st.title(f"{APP_CONFIG['APP_ICON']} تسجيل الدخول - {APP_CONFIG['APP_TITLE']}")
 
@@ -177,14 +229,17 @@ def login_ui():
                 save_state(state)
                 st.session_state.logged_in = True
                 st.session_state.username = username_input
-                st.success(f"✅ تم تسجيل الدخول: {username_input}")
+                st.session_state.user_role = users[username_input].get("role", "viewer")
+                st.session_state.user_permissions = users[username_input].get("permissions", ["view"])
+                st.success(f"✅ تم تسجيل الدخول: {username_input} ({st.session_state.user_role})")
                 st.rerun()
             else:
                 st.error("❌ كلمة المرور غير صحيحة.")
         return False
     else:
         username = st.session_state.username
-        st.success(f"✅ مسجل الدخول كـ: {username}")
+        user_role = st.session_state.user_role
+        st.success(f"✅ مسجل الدخول كـ: {username} ({user_role})")
         rem = remaining_time(state, username)
         if rem:
             mins, secs = divmod(int(rem.total_seconds()), 60)
@@ -386,15 +441,57 @@ def highlight_cell(val, col_name):
         "Event": "background-color: #e2f0d9; color:#2e6f32; font-weight:bold;",
         "Correction": "background-color: #fdebd0; color:#7d6608; font-weight:bold;",
         "Servised by": "background-color: #f0f0f0; color:#333; font-weight:bold;",
-        "Card Number": "background-color: #ebdef0; color:#4a235a; font-weight:bold;"
+        "Card Number": "background-color: #ebdef0; color:#4a235a; font-weight:bold;",
+        "Current Tons": "background-color: #e8f6f3; color:#1a5276; font-weight:bold;"  # إضافة تنسيق للعمود الجديد
     }
     return color_map.get(col_name, "")
 
 def style_table(row):
     return [highlight_cell(row[col], col) for col in row.index]
 
+def get_user_permissions(user_role, user_permissions):
+    """الحصول على صلاحيات المستخدم بناءً على الدور والصلاحيات"""
+    if "all" in user_permissions:
+        return {
+            "can_view": True,
+            "can_edit": True,
+            "can_manage_users": True,
+            "can_see_tech_support": True
+        }
+    elif "edit" in user_permissions:
+        return {
+            "can_view": True,
+            "can_edit": True,
+            "can_manage_users": False,
+            "can_see_tech_support": False
+        }
+    elif "view" in user_permissions:
+        return {
+            "can_view": True,
+            "can_edit": False,
+            "can_manage_users": False,
+            "can_see_tech_support": False
+        }
+    else:
+        # صلاحيات افتراضية للعرض فقط
+        return {
+            "can_view": True,
+            "can_edit": False,
+            "can_manage_users": False,
+            "can_see_tech_support": False
+        }
+
+def add_current_tons_column_to_all_cards(sheets_dict):
+    """إضافة عمود Current Tons لجميع شيتات الكروت إذا لم يكن موجوداً"""
+    updated = False
+    for sheet_name, df in sheets_dict.items():
+        if sheet_name.startswith("Card") and "Current Tons" not in df.columns:
+            df["Current Tons"] = 0  # القيمة الافتراضية
+            updated = True
+    return updated, sheets_dict
+
 # -------------------------------
-# 🖥 دالة فحص الماكينة
+# 🖥 دالة فحص الماكينة - معدلة لقراءة عمود Event بشكل صحيح وعرض Current Tons
 # -------------------------------
 def check_machine_status(card_num, current_tons, all_sheets):
     if not all_sheets:
@@ -413,6 +510,16 @@ def check_machine_status(card_num, current_tons, all_sheets):
         return
     
     card_df = all_sheets[card_sheet_name]
+    
+    # عرض القيمة الحالية من عمود Current Tons إذا كانت موجودة
+    if "Current Tons" in card_df.columns:
+        current_tons_series = pd.to_numeric(card_df["Current Tons"], errors='coerce')
+        current_tons_series = current_tons_series.dropna()
+        if not current_tons_series.empty:
+            actual_current_tons = current_tons_series.iloc[-1]
+            st.success(f"🔄 القيمة الفعلية الحالية من النظام: {actual_current_tons} طن**")
+            # تحديث القيمة المدخلة تلقائياً
+            current_tons = actual_current_tons
 
     # نطاق العرض
     if "view_option" not in st.session_state:
@@ -469,10 +576,10 @@ def check_machine_status(card_num, current_tons, all_sheets):
                 # تحديد الأعمدة التي تحتوي على خدمات منجزة
                 metadata_columns = {
                     "card", "Tones", "Min_Tones", "Max_Tones", "Date", 
-                    "Other", "Servised by", "Event", "Correction",
+                    "Other", "Servised by", "Event", "Correction", "Current Tons",
                     "Card", "TONES", "MIN_TONES", "MAX_TONES", "DATE",
-                    "OTHER", "EVENT", "CORRECTION", "SERVISED BY",
-                    "servised by", "Servised By", 
+                    "OTHER", "EVENT", "CORRECTION", "SERVISED BY", "CURRENT TONS",
+                    "servised by", "Servised By", "current tons", "Current tons",
                     "Serviced by", "Service by", "Serviced By", "Service By",
                     "خدم بواسطة", "تم الخدمة بواسطة", "فني الخدمة"
                 }
@@ -493,10 +600,58 @@ def check_machine_status(card_num, current_tons, all_sheets):
                         if val.lower() not in ["no", "false", "not done", "لم تتم", "x", "-"]:
                             done_services_set.add(col)
 
-                # جمع بيانات الحدث
+                # جمع بيانات الحدث - البحث عن عمود Event بأسماء مختلفة
                 current_date = str(row.get("Date", "")).strip() if pd.notna(row.get("Date")) else "-"
                 current_tones = str(row.get("Tones", "")).strip() if pd.notna(row.get("Tones")) else "-"
                 current_other = str(row.get("Other", "")).strip() if pd.notna(row.get("Other")) else "-"
+                
+                # البحث عن عمود "Event" بأسماء مختلفة
+                event_value = "-"
+                event_columns = [
+                    "Event", "EVENT", "event", "Events", "events",
+                    "الحدث", "الأحداث", "event", "events"
+                ]
+                
+                for potential_col in event_columns:
+                    if potential_col in card_df.columns:
+                        value = row.get(potential_col)
+                        if pd.notna(value) and str(value).strip() != "":
+                            event_value = str(value).strip()
+                            break
+                
+                # إذا لم نجد باسم Event، نبحث بأسماء بديلة
+                if event_value == "-":
+                    for col in card_df.columns:
+                        col_normalized = normalize_name(col)
+                        if col_normalized in ["event", "events", "الحدث", "الأحداث"]:
+                            value = row.get(col)
+                            if pd.notna(value) and str(value).strip() != "":
+                                event_value = str(value).strip()
+                                break
+                
+                # البحث عن عمود "Correction" بأسماء مختلفة
+                correction_value = "-"
+                correction_columns = [
+                    "Correction", "CORRECTION", "correction", "Correct", "correct",
+                    "تصحيح", "تصويب", "تصحيحات", "correction", "correct"
+                ]
+                
+                for potential_col in correction_columns:
+                    if potential_col in card_df.columns:
+                        value = row.get(potential_col)
+                        if pd.notna(value) and str(value).strip() != "":
+                            correction_value = str(value).strip()
+                            break
+                
+                # إذا لم نجد باسم Correction، نبحث بأسماء بديلة
+                if correction_value == "-":
+                    for col in card_df.columns:
+                        col_normalized = normalize_name(col)
+                        if col_normalized in ["correction", "correct", "تصحيح", "تصويب"]:
+                            value = row.get(col)
+                            if pd.notna(value) and str(value).strip() != "":
+                                correction_value = str(value).strip()
+                                break
                 
                 # البحث عن عمود "Servised by"
                 servised_by_value = "-"
@@ -522,9 +677,6 @@ def check_machine_status(card_num, current_tons, all_sheets):
                                 servised_by_value = str(value).strip()
                                 break
 
-                current_event = str(row.get("Event", "")).strip() if pd.notna(row.get("Event")) else "-"
-                current_correction = str(row.get("Correction", "")).strip() if pd.notna(row.get("Correction")) else "-"
-
                 done_services = sorted(list(done_services_set))
                 done_norm = [normalize_name(c) for c in done_services]
                 
@@ -542,8 +694,8 @@ def check_machine_status(card_num, current_tons, all_sheets):
                     "Service Done": ", ".join(done_services) if done_services else "-",
                     "Service Didn't Done": ", ".join(not_done) if not_done else "-",
                     "Tones": current_tones,
-                    "Event": current_event,
-                    "Correction": current_correction,
+                    "Event": event_value,
+                    "Correction": correction_value,
                     "Servised by": servised_by_value,
                     "Date": current_date
                 })
@@ -578,9 +730,9 @@ def check_machine_status(card_num, current_tons, all_sheets):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-# -------------------------------
+# ===============================
 # 🖥 الواجهة الرئيسية المدمجة
-# -------------------------------
+# ===============================
 # إعداد الصفحة
 st.set_page_config(page_title=APP_CONFIG["APP_TITLE"], layout="wide")
 
@@ -593,10 +745,11 @@ with st.sidebar:
     else:
         state = cleanup_sessions(load_state())
         username = st.session_state.username
+        user_role = st.session_state.user_role
         rem = remaining_time(state, username)
         if rem:
             mins, secs = divmod(int(rem.total_seconds()), 60)
-            st.success(f"👋 {username} | ⏳ {mins:02d}:{secs:02d}")
+            st.success(f"👋 {username} | الدور: {user_role} | ⏳ {mins:02d}:{secs:02d}")
         else:
             logout_action()
 
@@ -628,22 +781,22 @@ sheets_edit = load_sheets_for_edit()
 # واجهة التبويبات الرئيسية
 st.title(f"{APP_CONFIG['APP_ICON']} {APP_CONFIG['APP_TITLE']}")
 
-# التحقق من الصلاحيات لعرض التبويبات المناسبة
+# التحقق من الصلاحيات - استخدم .get() لمنع الأخطاء
 username = st.session_state.get("username")
-is_admin = username == "admin"
+user_role = st.session_state.get("user_role", "viewer")
+user_permissions = st.session_state.get("user_permissions", ["view"])
+permissions = get_user_permissions(user_role, user_permissions)
 
-# تحديد التبويبات بناءً على نوع المستخدم والإعدادات
-if is_admin:
+# تحديد التبويبات بناءً على الصلاحيات
+if permissions["can_manage_users"]:  # admin
     tabs = st.tabs(APP_CONFIG["CUSTOM_TABS"])
-else:
-    # للمستخدمين العاديين: نعرض تبويب العرض فقط، وإضافة الدعم الفني إذا كان مسموحاً
-    regular_tabs = ["📊 عرض وفحص الماكينات"]
-    if APP_CONFIG["SHOW_TECH_SUPPORT_TO_ALL"]:
-        regular_tabs.append("📞 الدعم الفني")
-    tabs = st.tabs(regular_tabs)
+elif permissions["can_edit"]:  # editor
+    tabs = st.tabs(["📊 عرض وفحص الماكينات", "🛠 تعديل وإدارة البيانات"])
+else:  # viewer
+    tabs = st.tabs(["📊 عرض وفحص الماكينات"])
 
 # -------------------------------
-# Tab: عرض وفحص الماكينات
+# Tab: عرض وفحص الماكينات (لجميع المستخدمين)
 # -------------------------------
 with tabs[0]:
     st.header("📊 عرض وفحص الماكينات")
@@ -664,9 +817,9 @@ with tabs[0]:
             check_machine_status(card_num, current_tons, all_sheets)
 
 # -------------------------------
-# Tab: تعديل وإدارة البيانات - للمسؤول فقط
+# Tab: تعديل وإدارة البيانات - للمحررين والمسؤولين فقط
 # -------------------------------
-if is_admin and len(tabs) > 1:
+if permissions["can_edit"] and len(tabs) > 1:
     with tabs[1]:
         st.header("🛠 تعديل وإدارة البيانات")
 
@@ -677,11 +830,12 @@ if is_admin and len(tabs) > 1:
         if sheets_edit is None:
             st.warning("❗ الملف المحلي غير موجود. اضغط تحديث من GitHub في الشريط الجانبي أولًا.")
         else:
-            tab1, tab2, tab3, tab4 = st.tabs([
+            tab1, tab2, tab3, tab4, tab5 = st.tabs([
                 "عرض وتعديل شيت",
                 "إضافة صف جديد", 
                 "إضافة عمود جديد",
-                "🗑 حذف صف"
+                "🗑 حذف صف",
+                "⚡ عداد السرعة والإنتاج"  # التبويب الجديد
             ])
 
             # -------------------------------
@@ -883,10 +1037,188 @@ if is_admin and len(tabs) > 1:
                         except Exception as e:
                             st.error(f"حدث خطأ أثناء الحذف: {e}")
 
+            # -------------------------------
+            # Tab 5: عداد السرعة والإنتاج - التبويب الجديد
+            # -------------------------------
+            with tab5:
+                st.header("⚡ عداد السرعة والإنتاج الفعلي")
+                
+                if sheets_edit is None:
+                    st.warning("❗ الملف المحلي غير موجود. اضغط تحديث من GitHub في الشريط الجانبي أولًا.")
+                else:
+                    # التأكد من وجود عمود Current Tons في جميع شيتات الكروت
+                    updated, sheets_edit = add_current_tons_column_to_all_cards(sheets_edit)
+                    if updated:
+                        st.info("✅ تم إضافة عمود 'Current Tons' لجميع شيتات الكروت تلقائياً")
+                        # حفظ التغيير تلقائياً
+                        new_sheets = auto_save_to_github(
+                            sheets_edit,
+                            "إضافة عمود Current Tons لجميع الكروت"
+                        )
+                        if new_sheets is not None:
+                            sheets_edit = new_sheets
+                    
+                    # اختيار الماكينة
+                    card_sheets = [name for name in sheets_edit.keys() if name.startswith("Card")]
+                    if not card_sheets:
+                        st.warning("⚠ لا توجد شيتات كروت متاحة")
+                    else:
+                        selected_card = st.selectbox("اختر الماكينة:", card_sheets, key="speed_counter_card")
+                        
+                        # عرض البيانات الحالية
+                        st.subheader("📊 البيانات الحالية للماكينة")
+                        card_df = sheets_edit[selected_card]
+                        
+                        # البحث عن آخر قيمة لـ Current Tons
+                        current_tons_value = 0
+                        if "Current Tons" in card_df.columns:
+                            # أخذ آخر قيمة غير فارغة
+                            tons_series = pd.to_numeric(card_df["Current Tons"], errors='coerce')
+                            tons_series = tons_series.dropna()
+                            if not tons_series.empty:
+                                current_tons_value = tons_series.iloc[-1]
+                        
+                        st.info(f"*عدد الأطنان الحالي للماكينة: {current_tons_value} طن*")
+                        
+                        # إدخال بيانات الإنتاج
+                        st.subheader("🔄 تحديث الإنتاج")
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            operating_hours = st.number_input(
+                                "عدد ساعات التشغيل:",
+                                min_value=0.0,
+                                max_value=24.0,
+                                value=8.0,
+                                step=0.5,
+                                help="عدد الساعات التي عملت فيها الماكينة"
+                            )
+                        
+                        with col2:
+                            machine_speed = st.number_input(
+                                "سرعة الماكينة (طن/ساعة):",
+                                min_value=0.0,
+                                value=85.0,
+                                step=1.0,
+                                help="سرعة إنتاج الماكينة بالطن في الساعة"
+                            )
+                        
+                        with col3:
+                            additional_production = st.number_input(
+                                "إنتاج إضافي (طن):",
+                                min_value=0.0,
+                                value=0.0,
+                                step=10.0,
+                                help="أي إنتاج إضافي غير محسوب بالسرعة"
+                            )
+                        
+                        # حساب الإنتاج الجديد
+                        new_production = (operating_hours * machine_speed) + additional_production
+                        new_total_tons = current_tons_value + new_production
+                        
+                        st.success(f"*الإنتاج المضاف: {new_production:.2f} طن*")
+                        st.success(f"*إجمالي الأطنان الجديد: {new_total_tons:.2f} طن*")
+                        
+                        # خيارات التحديث
+                        st.subheader("💾 خيارات الحفظ")
+                        
+                        update_method = st.radio(
+                            "طريقة التحديث:",
+                            [
+                                "إضافة كحدث جديد مع التاريخ",
+                                "تحديث القيمة الحالية فقط"
+                            ],
+                            key="update_method"
+                        )
+                        
+                        if st.button("💾 تحديث بيانات الإنتاج", type="primary"):
+                            if update_method == "إضافة كحدث جديد مع التاريخ":
+                                # إنشاء صف جديد
+                                new_row = {}
+                                
+                                # نسخ بيانات الأعمدة الأساسية
+                                base_columns = ["Min_Tones", "Max_Tones", "Service", "Tones", "Date"]
+                                for col in card_df.columns:
+                                    if col in base_columns:
+                                        new_row[col] = ""
+                                    elif col == "Current Tons":
+                                        new_row[col] = new_total_tons
+                                    elif col == "Tones":
+                                        new_row[col] = f"+{new_production:.2f}"
+                                    elif col == "Date":
+                                        new_row[col] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                                    elif col == "Event":
+                                        new_row[col] = f"تحديث إنتاجي: {operating_hours}h @ {machine_speed}t/h"
+                                    else:
+                                        new_row[col] = ""
+                                
+                                # إضافة الصف الجديد
+                                new_row_df = pd.DataFrame([new_row])
+                                updated_df = pd.concat([card_df, new_row_df], ignore_index=True)
+                                
+                            else:  # تحديث القيمة الحالية فقط
+                                updated_df = card_df.copy()
+                                if "Current Tons" in updated_df.columns:
+                                    # تحديث آخر صف به قيمة
+                                    tons_mask = pd.to_numeric(updated_df["Current Tons"], errors='coerce').notna()
+                                    if tons_mask.any():
+                                        last_idx = tons_mask[tons_mask].index[-1]
+                                        updated_df.at[last_idx, "Current Tons"] = new_total_tons
+                                    else:
+                                        # إذا لم توجد أي قيم، نضيف صفاً جديداً
+                                        new_row = {"Current Tons": new_total_tons}
+                                        for col in updated_df.columns:
+                                            if col != "Current Tons":
+                                                new_row[col] = ""
+                                        new_row_df = pd.DataFrame([new_row])
+                                        updated_df = pd.concat([updated_df, new_row_df], ignore_index=True)
+                            
+                            sheets_edit[selected_card] = updated_df.astype(object)
+                            
+                            # حفظ تلقائي في GitHub
+                            new_sheets = auto_save_to_github(
+                                sheets_edit,
+                                f"تحديث إنتاج {selected_card}: {new_production:.2f} طن → {new_total_tons:.2f} طن"
+                            )
+                            if new_sheets is not None:
+                                sheets_edit = new_sheets
+                                st.rerun()
+                        
+                        # عرض سجل الإنتاج
+                        st.subheader("📈 سجل الإنتاج")
+                        if "Current Tons" in card_df.columns:
+                            production_history = card_df[["Date", "Tones", "Current Tons", "Event"]].copy()
+                            production_history = production_history.dropna(subset=["Current Tons"])
+                            production_history["Current Tons"] = pd.to_numeric(production_history["Current Tons"], errors='coerce')
+                            production_history = production_history.dropna(subset=["Current Tons"])
+                            
+                            if not production_history.empty:
+                                st.dataframe(
+                                    production_history.sort_values("Current Tons", ascending=False),
+                                    use_container_width=True
+                                )
+                                
+                                # رسم بياني مبسط للتطور
+                                try:
+                                    chart_data = production_history[["Date", "Current Tons"]].copy()
+                                    chart_data["Date"] = pd.to_datetime(chart_data["Date"], errors='coerce')
+                                    chart_data = chart_data.dropna()
+                                    chart_data = chart_data.sort_values("Date")
+                                    
+                                    if not chart_data.empty:
+                                        st.line_chart(
+                                            chart_data.set_index("Date")["Current Tons"],
+                                            use_container_width=True
+                                        )
+                                except Exception as e:
+                                    st.warning(f"⚠ لا يمكن عرض الرسم البياني: {e}")
+                            else:
+                                st.info("لا توجد بيانات سابقة للإنتاج.")
+
 # -------------------------------
 # Tab: إدارة المستخدمين - للمسؤول فقط
 # -------------------------------
-if is_admin and len(tabs) > 2:
+if permissions["can_manage_users"] and len(tabs) > 2:
     with tabs[2]:
         st.header("👥 إدارة المستخدمين")
         
@@ -902,6 +1234,7 @@ if is_admin and len(tabs) > 2:
                 user_data.append({
                     "اسم المستخدم": username,
                     "الدور": info.get("role", "user"),
+                    "الصلاحيات": ", ".join(info.get("permissions", [])),
                     "تاريخ الإنشاء": info.get("created_at", "غير معروف")
                 })
             
@@ -919,7 +1252,7 @@ if is_admin and len(tabs) > 2:
         with col2:
             new_password = st.text_input("كلمة المرور:", type="password")
         with col3:
-            user_role = st.selectbox("الدور:", ["user", "admin"])
+            user_role = st.selectbox("الدور:", ["admin", "editor", "viewer"])
         
         if st.button("إضافة مستخدم", key="add_user"):
             if not new_username.strip() or not new_password.strip():
@@ -927,9 +1260,18 @@ if is_admin and len(tabs) > 2:
             elif new_username in users:
                 st.warning("⚠ هذا المستخدم موجود بالفعل.")
             else:
+                # تحديد الصلاحيات بناءً على الدور
+                if user_role == "admin":
+                    permissions_list = ["all"]
+                elif user_role == "editor":
+                    permissions_list = ["view", "edit"]
+                else:  # viewer
+                    permissions_list = ["view"]
+                
                 users[new_username] = {
                     "password": new_password,
                     "role": user_role,
+                    "permissions": permissions_list,
                     "created_at": datetime.now().isoformat()
                 }
                 if save_users(users):
@@ -993,5 +1335,39 @@ if is_admin and len(tabs) > 2:
                     else:
                         st.error("❌ حدث خطأ أثناء حفظ التغييرات.")
 
+# -------------------------------
+# Tab: الدعم الفني - للمسؤول فقط أو إذا كان مسموحاً للجميع
+# -------------------------------
+tech_support_tab_index = 3 if permissions["can_manage_users"] else (
+    2 if permissions["can_edit"] and not permissions["can_manage_users"] else 1
+)
 
-
+if ((permissions["can_manage_users"] and len(tabs) > 3) or 
+    (permissions["can_see_tech_support"] and len(tabs) > tech_support_tab_index)):
+    
+    with tabs[tech_support_tab_index]:
+        st.header("📞 الدعم الفني")
+        
+        st.markdown("## 🛠 معلومات التطوير والدعم")
+        st.markdown("تم تطوير هذا التطبيق بواسطة:")
+        st.markdown("### م. محمد عبدالله")
+        st.markdown("### رئيس قسم الكرد والمحطات")
+        st.markdown("### مصنع بيل يارن للغزل")
+        st.markdown("---")
+        st.markdown("### معلومات الاتصال:")
+        st.markdown("- 📧 البريد الإلكتروني: medotatch124@gmail.com")
+        st.markdown("- 📞 هاتف: 01274424062")
+        st.markdown("- 🏢 الموقع: مصنع بيل يارن للغزل")
+        st.markdown("---")
+        st.markdown("### خدمات الدعم الفني:")
+        st.markdown("- 🔧 صيانة وتحديث النظام")
+        st.markdown("- 📊 تطوير تقارير إضافية")
+        st.markdown("- 🐛 إصلاح الأخطاء والمشكلات")
+        st.markdown("- 💡 استشارات فنية وتقنية")
+        st.markdown("---")
+        st.markdown("### إصدار النظام:")
+        st.markdown("- الإصدار: 1.0")
+        st.markdown("- آخر تحديث: 2025")
+        st.markdown("- النظام: نظام سيرفيس كرد ترتشلر")
+        
+        st.info("ملاحظة: في حالة مواجهة أي مشاكل تقنية أو تحتاج إلى إضافة ميزات جديدة، يرجى التواصل مع قسم الدعم الفني.")
