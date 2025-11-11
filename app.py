@@ -21,7 +21,7 @@ except Exception:
 # ===============================
 APP_CONFIG = {
     # إعدادات التطبيق العامة
-    "APP_TITLE": "CMMS - BELYARN2",
+    "APP_TITLE": "CMMS - BELYARN",
     "APP_ICON": "🏭",
     
     # إعدادات GitHub
@@ -542,17 +542,32 @@ def check_machine_status(card_num, current_tons, all_sheets):
         with col2:
             max_range = st.number_input("إلى (طن):", min_value=min_range, step=100, value=max_range, key="max_range")
 
-    # اختيار الشرائح
-    if view_option == "الشريحة الحالية فقط":
-        selected_slices = service_plan_df[(service_plan_df["Min_Tones"] <= current_tons) & (service_plan_df["Max_Tones"] >= current_tons)]
-    elif view_option == "كل الشرائح الأقل":
-        selected_slices = service_plan_df[service_plan_df["Max_Tones"] <= current_tons]
-    elif view_option == "كل الشرائح الأعلى":
-        selected_slices = service_plan_df[service_plan_df["Min_Tones"] >= current_tons]
-    elif view_option == "نطاق مخصص":
-        selected_slices = service_plan_df[(service_plan_df["Min_Tones"] >= min_range) & (service_plan_df["Max_Tones"] <= max_range)]
-    else:
-        selected_slices = service_plan_df.copy()
+    # التحقق من وجود أعمدة Min_Tones و Max_Tones في service_plan_df
+    if "Min_Tones" not in service_plan_df.columns or "Max_Tones" not in service_plan_df.columns:
+        st.error("❌ شيت ServicePlan لا يحتوي على أعمدة Min_Tones و/أو Max_Tones")
+        return
+
+    # اختيار الشرائح مع معالجة الأخطاء
+    try:
+        if view_option == "الشريحة الحالية فقط":
+            selected_slices = service_plan_df[
+                (service_plan_df["Min_Tones"].fillna(0) <= current_tons) & 
+                (service_plan_df["Max_Tones"].fillna(0) >= current_tons)
+            ]
+        elif view_option == "كل الشرائح الأقل":
+            selected_slices = service_plan_df[service_plan_df["Max_Tones"].fillna(0) <= current_tons]
+        elif view_option == "كل الشرائح الأعلى":
+            selected_slices = service_plan_df[service_plan_df["Min_Tones"].fillna(0) >= current_tons]
+        elif view_option == "نطاق مخصص":
+            selected_slices = service_plan_df[
+                (service_plan_df["Min_Tones"].fillna(0) >= min_range) & 
+                (service_plan_df["Max_Tones"].fillna(0) <= max_range)
+            ]
+        else:
+            selected_slices = service_plan_df.copy()
+    except Exception as e:
+        st.error(f"❌ خطأ في تصفية الشرائح: {e}")
+        return
 
     if selected_slices.empty:
         st.warning("⚠ لا توجد شرائح مطابقة حسب النطاق المحدد.")
@@ -565,6 +580,11 @@ def check_machine_status(card_num, current_tons, all_sheets):
         needed_service_raw = current_slice.get("Service", "")
         needed_parts = split_needed_services(needed_service_raw)
         needed_norm = [normalize_name(p) for p in needed_parts]
+
+        # التحقق من وجود أعمدة Min_Tones و Max_Tones في card_df
+        if "Min_Tones" not in card_df.columns or "Max_Tones" not in card_df.columns:
+            st.error(f"❌ شيت {card_sheet_name} لا يحتوي على أعمدة Min_Tones و/أو Max_Tones")
+            return
 
         mask = (card_df.get("Min_Tones", 0).fillna(0) <= slice_max) & (card_df.get("Max_Tones", 0).fillna(0) >= slice_min)
         matching_rows = card_df[mask]
@@ -1184,36 +1204,56 @@ if permissions["can_edit"] and len(tabs) > 1:
                                 sheets_edit = new_sheets
                                 st.rerun()
                         
-                        # عرض سجل الإنتاج
+                        # عرض سجل الإنتاج - معدل للتحقق من وجود الأعمدة
                         st.subheader("📈 سجل الإنتاج")
                         if "Current Tons" in card_df.columns:
-                            production_history = card_df[["Date", "Tones", "Current Tons", "Event"]].copy()
-                            production_history = production_history.dropna(subset=["Current Tons"])
-                            production_history["Current Tons"] = pd.to_numeric(production_history["Current Tons"], errors='coerce')
-                            production_history = production_history.dropna(subset=["Current Tons"])
+                            # تحديد الأعمدة المتاحة لعرضها
+                            available_columns = []
+                            for col in ["Date", "Tones", "Current Tons", "Event"]:
+                                if col in card_df.columns:
+                                    available_columns.append(col)
                             
-                            if not production_history.empty:
-                                st.dataframe(
-                                    production_history.sort_values("Current Tons", ascending=False),
-                                    use_container_width=True
-                                )
+                            if available_columns:
+                                production_history = card_df[available_columns].copy()
+                                production_history = production_history.dropna(subset=["Current Tons"])
+                                production_history["Current Tons"] = pd.to_numeric(production_history["Current Tons"], errors='coerce')
+                                production_history = production_history.dropna(subset=["Current Tons"])
                                 
-                                # رسم بياني مبسط للتطور
-                                try:
-                                    chart_data = production_history[["Date", "Current Tons"]].copy()
-                                    chart_data["Date"] = pd.to_datetime(chart_data["Date"], errors='coerce')
-                                    chart_data = chart_data.dropna()
-                                    chart_data = chart_data.sort_values("Date")
+                                if not production_history.empty:
+                                    st.dataframe(
+                                        production_history.sort_values("Current Tons", ascending=False),
+                                        use_container_width=True
+                                    )
                                     
-                                    if not chart_data.empty:
-                                        st.line_chart(
-                                            chart_data.set_index("Date")["Current Tons"],
-                                            use_container_width=True
-                                        )
-                                except Exception as e:
-                                    st.warning(f"⚠ لا يمكن عرض الرسم البياني: {e}")
+                                    # رسم بياني مبسط للتطور
+                                    try:
+                                        chart_data = production_history[["Current Tons"]].copy()
+                                        
+                                        # إذا كان عمود التاريخ متاحاً، استخدمه كمؤشر
+                                        if "Date" in production_history.columns:
+                                            chart_data["Date"] = pd.to_datetime(production_history["Date"], errors='coerce')
+                                            chart_data = chart_data.dropna(subset=["Date"])
+                                            chart_data = chart_data.sort_values("Date")
+                                            if not chart_data.empty:
+                                                st.line_chart(
+                                                    chart_data.set_index("Date")["Current Tons"],
+                                                    use_container_width=True
+                                                )
+                                        else:
+                                            # إذا لم يكن هناك تاريخ، استخدم الفهرس
+                                            chart_data.index = range(len(chart_data))
+                                            st.line_chart(
+                                                chart_data["Current Tons"],
+                                                use_container_width=True
+                                            )
+                                    except Exception as e:
+                                        st.warning(f"⚠ لا يمكن عرض الرسم البياني: {e}")
+                                else:
+                                    st.info("لا توجد بيانات سابقة للإنتاج.")
                             else:
-                                st.info("لا توجد بيانات سابقة للإنتاج.")
+                                st.info("لا توجد أعمدة متاحة لعرض سجل الإنتاج.")
+                        else:
+                            st.info("لا يوجد عمود 'Current Tons' في شيت الماكينة.")
 
 # -------------------------------
 # Tab: إدارة المستخدمين - للمسؤول فقط
