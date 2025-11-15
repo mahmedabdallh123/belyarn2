@@ -62,7 +62,61 @@ APP_CONFIG = {
     },
     
     # الأعمدة الإلزامية لمحطات الإنتاج
-    "MANDATORY_COLUMNS": ["الحدث", "التصحيح الفني", "التاريخ"]
+    "MANDATORY_COLUMNS": ["الحدث", "التصحيح الفني", "التاريخ"],
+    
+    # الأدوار والصلاحيات
+    "ROLES": {
+        "admin": {
+            "name": "مدير النظام",
+            "permissions": ["all"],
+            "departments": ["all"]
+        },
+        "cotton_manager": {
+            "name": "مدير مكبس القطن", 
+            "permissions": ["view_stats", "data_entry", "edit"],
+            "departments": ["cotton"]
+        },
+        "cmms_manager": {
+            "name": "مدير الصيانة",
+            "permissions": ["view", "edit"],
+            "departments": ["cmms"]
+        },
+        "production_manager": {
+            "name": "مدير المحطات",
+            "permissions": ["view", "edit"],
+            "departments": ["production"]
+        },
+        "cotton_editor": {
+            "name": "محرر مكبس القطن",
+            "permissions": ["data_entry"],
+            "departments": ["cotton"]
+        },
+        "cotton_viewer": {
+            "name": "مشاهد مكبس القطن",
+            "permissions": ["view_stats"],
+            "departments": ["cotton"]
+        },
+        "cmms_editor": {
+            "name": "محرر الصيانة",
+            "permissions": ["view", "edit"],
+            "departments": ["cmms"]
+        },
+        "cmms_viewer": {
+            "name": "مشاهد الصيانة",
+            "permissions": ["view"],
+            "departments": ["cmms"]
+        },
+        "production_editor": {
+            "name": "محرر المحطات",
+            "permissions": ["view", "edit"],
+            "departments": ["production"]
+        },
+        "production_viewer": {
+            "name": "مشاهد المحطات", 
+            "permissions": ["view"],
+            "departments": ["production"]
+        }
+    }
 }
 
 # ===============================
@@ -77,75 +131,133 @@ MAX_ACTIVE_USERS = APP_CONFIG["MAX_ACTIVE_USERS"]
 # 🧩 دوال مساعدة للملفات والحالة
 # -------------------------------
 def load_users():
-    """تحميل بيانات المستخدمين من ملف JSON"""
+    """تحميل بيانات المستخدمين من ملف JSON مع إعدادات متقدمة"""
     if not os.path.exists(USERS_FILE):
         default_users = {
             "admin": {
-                "password": "1111", 
-                "role": "admin", 
+                "password": "admin123",
+                "role": "admin",
                 "created_at": datetime.now().isoformat(),
-                "permissions": ["all"],
+                "last_modified": datetime.now().isoformat(),
+                "created_by": "system",
                 "full_name": "المسؤول الرئيسي",
-                "department": "all"
+                "department": "all",
+                "permissions": ["all"],
+                "is_active": True,
+                "email": "admin@belyarn.com",
+                "phone": "01274424062"
             },
-            "user1": {
-                "password": "12345", 
-                "role": "data_entry", 
+            "cotton_manager": {
+                "password": "cotton123",
+                "role": "cotton_manager",
                 "created_at": datetime.now().isoformat(),
-                "permissions": ["data_entry"],
-                "full_name": "مستخدم مكبس القطن",
-                "department": "cotton"
+                "last_modified": datetime.now().isoformat(),
+                "created_by": "system",
+                "full_name": "مدير مكبس القطن",
+                "department": "cotton",
+                "permissions": ["view_stats", "data_entry", "edit"],
+                "is_active": True
             },
-            "user2": {
-                "password": "99999", 
-                "role": "viewer", 
+            "cmms_manager": {
+                "password": "cmms123",
+                "role": "cmms_manager",
                 "created_at": datetime.now().isoformat(),
-                "permissions": ["view_stats"],
-                "full_name": "مستخدم CMMS",
-                "department": "cmms"
-            },
-            "user3": {
-                "password": "88888", 
-                "role": "editor", 
-                "created_at": datetime.now().isoformat(),
+                "last_modified": datetime.now().isoformat(),
+                "created_by": "system",
+                "full_name": "مدير الصيانة",
+                "department": "cmms",
                 "permissions": ["view", "edit"],
-                "full_name": "مستخدم محطات الإنتاج",
-                "department": "production"
+                "is_active": True
+            },
+            "production_manager": {
+                "password": "production123",
+                "role": "production_manager",
+                "created_at": datetime.now().isoformat(),
+                "last_modified": datetime.now().isoformat(),
+                "created_by": "system",
+                "full_name": "مدير المحطات",
+                "department": "production",
+                "permissions": ["view", "edit"],
+                "is_active": True
             }
         }
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(default_users, f, indent=4, ensure_ascii=False)
         return default_users
+    
     try:
         with open(USERS_FILE, "r", encoding="utf-8") as f:
             users = json.load(f)
+            
+            # تحديث الهيكل لجميع المستخدمين
             for username, info in users.items():
+                # تعيين القيم الافتراضية إذا كانت مفقودة
+                if "role" not in info:
+                    info["role"] = "viewer"
+                
                 if "department" not in info:
-                    info["department"] = "all"
+                    info["department"] = "all" if info["role"] == "admin" else "cotton"
+                
+                if "permissions" not in info:
+                    info["permissions"] = APP_CONFIG["ROLES"].get(info["role"], {}).get("permissions", ["view"])
+                
                 if "full_name" not in info:
                     info["full_name"] = username
+                
+                if "is_active" not in info:
+                    info["is_active"] = True
+                
+                if "created_at" not in info:
+                    info["created_at"] = datetime.now().isoformat()
+                
+                if "last_modified" not in info:
+                    info["last_modified"] = datetime.now().isoformat()
+                
+                if "created_by" not in info:
+                    info["created_by"] = "system"
+            
             return users
     except Exception as e:
-        st.error(f"❌ خطأ في ملف users.json: {e}")
+        st.error(f"❌ خطأ في تحميل ملف المستخدمين: {e}")
+        # إرجاع مستخدم admin افتراضي في حالة الخطأ
         return {
             "admin": {
-                "password": "1111", 
-                "role": "admin", 
-                "permissions": ["all"], 
+                "password": "admin123",
+                "role": "admin",
                 "created_at": datetime.now().isoformat(),
+                "last_modified": datetime.now().isoformat(),
+                "created_by": "system",
                 "full_name": "المسؤول الرئيسي",
-                "department": "all"
+                "department": "all",
+                "permissions": ["all"],
+                "is_active": True
             }
         }
 
 def save_users(users):
-    """حفظ بيانات المستخدمين إلى ملف JSON"""
+    """حفظ بيانات المستخدمين إلى ملف JSON مع تحديث وقت التعديل"""
     try:
+        # تحديث وقت التعديل للمستخدمين الذين تم تعديلهم
+        current_user = st.session_state.get("username", "system")
+        for username, info in users.items():
+            if "last_modified" not in info or info.get("modified_by") != current_user:
+                info["last_modified"] = datetime.now().isoformat()
+                info["modified_by"] = current_user
+        
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(users, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
-        st.error(f"❌ خطأ في حفظ ملف users.json: {e}")
+        st.error(f"❌ خطأ في حفظ ملف المستخدمين: {e}")
+        return False
+
+def auto_save_users(users, operation_description):
+    """حفظ تلقائي لبيانات المستخدمين"""
+    if save_users(users):
+        st.success(f"✅ تم {operation_description} وحفظ التغييرات تلقائياً")
+        return True
+    else:
+        st.error("❌ فشل الحفظ التلقائي لبيانات المستخدمين")
         return False
 
 def load_state():
@@ -212,7 +324,7 @@ def logout_action():
     st.rerun()
 
 # -------------------------------
-# 🧠 واجهة تسجيل الدخول
+# 🧠 واجهة تسجيل الدخول المتقدمة
 # -------------------------------
 def login_ui():
     users = load_users()
@@ -229,32 +341,51 @@ def login_ui():
 
     st.title(f"{APP_CONFIG['APP_ICON']} تسجيل الدخول - {APP_CONFIG['APP_TITLE']}")
 
-    username_input = st.selectbox("👤 اختر المستخدم", list(users.keys()))
+    # تصفية المستخدمين النشطين فقط
+    active_users = {username: info for username, info in users.items() if info.get("is_active", True)}
+    
+    if not active_users:
+        st.error("❌ لا يوجد مستخدمين نشطين في النظام")
+        return False
+
+    username_input = st.selectbox("👤 اختر المستخدم", list(active_users.keys()))
+    
+    user_info = active_users[username_input]
+    user_role_name = APP_CONFIG["ROLES"].get(user_info["role"], {}).get("name", user_info["role"])
+    
+    st.info(f"الدور: {user_role_name} | القسم: {user_info.get('department', 'غير محدد')}")
+    
     password = st.text_input("🔑 كلمة المرور", type="password")
 
-    active_users = [u for u, v in state.items() if v.get("active")]
-    active_count = len(active_users)
+    active_sessions = [u for u, v in state.items() if v.get("active")]
+    active_count = len(active_sessions)
     st.caption(f"🔒 المستخدمون النشطون الآن: {active_count} / {MAX_ACTIVE_USERS}")
 
     if not st.session_state.logged_in:
-        if st.button("تسجيل الدخول", type="primary"):
+        if st.button("تسجيل الدخول", type="primary", use_container_width=True):
             if username_input in users and users[username_input]["password"] == password:
-                if username_input == "admin":
-                    pass
-                elif username_input in active_users:
+                if not users[username_input].get("is_active", True):
+                    st.error("❌ هذا الحساب غير مفعل")
+                    return False
+                elif username_input in active_sessions:
                     st.warning("⚠ هذا المستخدم مسجل دخول بالفعل.")
                     return False
                 elif active_count >= MAX_ACTIVE_USERS:
                     st.error("🚫 الحد الأقصى للمستخدمين المتصلين حالياً.")
                     return False
+                
+                # تسجيل الدخول الناجح
                 state[username_input] = {"active": True, "login_time": datetime.now().isoformat()}
                 save_state(state)
+                
+                # تعيين بيانات الجلسة
                 st.session_state.logged_in = True
                 st.session_state.username = username_input
-                st.session_state.user_role = users[username_input].get("role", "viewer")
-                st.session_state.user_permissions = users[username_input].get("permissions", ["view_stats"])
-                st.session_state.user_fullname = users[username_input].get("full_name", username_input)
-                st.session_state.user_department = users[username_input].get("department", "all")
+                st.session_state.user_role = user_info["role"]
+                st.session_state.user_permissions = user_info.get("permissions", [])
+                st.session_state.user_fullname = user_info.get("full_name", username_input)
+                st.session_state.user_department = user_info.get("department", "all")
+                
                 st.success(f"✅ تم تسجيل الدخول: {st.session_state.user_fullname}")
                 st.rerun()
             else:
@@ -262,9 +393,11 @@ def login_ui():
         return False
     else:
         username = st.session_state.username
-        user_fullname = st.session_state.get("user_fullname", username)  # استخدام get للسلامة
+        user_fullname = st.session_state.get("user_fullname", username)
         user_role = st.session_state.user_role
-        st.success(f"✅ مسجل الدخول كـ: {user_fullname} ({user_role})")
+        user_role_name = APP_CONFIG["ROLES"].get(user_role, {}).get("name", user_role)
+        
+        st.success(f"✅ مسجل الدخول كـ: {user_fullname} ({user_role_name})")
         rem = remaining_time(state, username)
         if rem:
             mins, secs = divmod(int(rem.total_seconds()), 60)
@@ -272,7 +405,8 @@ def login_ui():
         else:
             st.warning("⏰ انتهت الجلسة، سيتم تسجيل الخروج.")
             logout_action()
-        if st.button("🚪 تسجيل الخروج"):
+        
+        if st.button("🚪 تسجيل الخروج", use_container_width=True):
             logout_action()
         return True
 
@@ -300,32 +434,6 @@ def fetch_from_github_requests(department):
         return True
     except Exception as e:
         st.error(f"⚠ فشل التحديث من GitHub: {e}")
-        return False
-
-def fetch_from_github_api(department):
-    """تحميل عبر GitHub API"""
-    if not GITHUB_AVAILABLE:
-        return fetch_from_github_requests(department)
-    
-    try:
-        token = st.secrets.get("github", {}).get("token", None)
-        if not token:
-            return fetch_from_github_requests(department)
-        
-        repo_config = APP_CONFIG["REPOS"][department]
-        g = Github(token)
-        repo = g.get_repo(repo_config["REPO_NAME"])
-        file_content = repo.get_contents(repo_config["FILE_PATH"], ref="main")
-        content = b64decode(file_content.content)
-        with open(repo_config["LOCAL_FILE"], "wb") as f:
-            f.write(content)
-        try:
-            st.cache_data.clear()
-        except:
-            pass
-        return True
-    except Exception as e:
-        st.error(f"⚠ فشل تحميل الملف من GitHub: {e}")
         return False
 
 # -------------------------------
@@ -796,52 +904,64 @@ def separate_mandatory_columns(all_columns):
 
 def get_user_permissions(user_role, user_permissions, user_department, current_department):
     """الحصول على صلاحيات المستخدم بناءً على الدور والقسم"""
-    if user_department == "all" or user_department == current_department:
-        if "all" in user_permissions:
-            return {
-                "can_input": True,
-                "can_view_stats": True,
-                "can_edit": True,
-                "can_manage_users": True,
-                "can_see_tech_support": True
-            }
-        elif "data_entry" in user_permissions:
-            return {
-                "can_input": True,
-                "can_view_stats": False,
-                "can_edit": False,
-                "can_manage_users": False,
-                "can_see_tech_support": False
-            }
-        elif "view_stats" in user_permissions:
-            return {
-                "can_input": False,
-                "can_view_stats": True,
-                "can_edit": False,
-                "can_manage_users": False,
-                "can_see_tech_support": False
-            }
-        elif "edit" in user_permissions:
-            return {
-                "can_input": True,
-                "can_view_stats": True,
-                "can_edit": True,
-                "can_manage_users": False,
-                "can_see_tech_support": False
-            }
-        elif "view" in user_permissions:
-            return {
-                "can_input": False,
-                "can_view_stats": True,
-                "can_edit": False,
-                "can_manage_users": False,
-                "can_see_tech_support": False
-            }
+    # Admin لديه جميع الصلاحيات في جميع الأقسام
+    if user_role == "admin" or "all" in user_permissions:
+        return {
+            "can_input": True,
+            "can_view_stats": True,
+            "can_edit": True,
+            "can_manage_users": True,
+            "can_see_tech_support": True
+        }
     
-    # إذا لم يكن المستخدم مصرح له لهذا القسم
+    # التحقق من أن المستخدم مصرح له في هذا القسم
+    if user_department != "all" and user_department != current_department:
+        return {
+            "can_input": False,
+            "can_view_stats": False,
+            "can_edit": False,
+            "can_manage_users": False,
+            "can_see_tech_support": False
+        }
+    
+    # الصلاحيات بناءً على الدور
+    if "data_entry" in user_permissions:
+        return {
+            "can_input": True,
+            "can_view_stats": False,
+            "can_edit": False,
+            "can_manage_users": False,
+            "can_see_tech_support": False
+        }
+    elif "view_stats" in user_permissions:
+        return {
+            "can_input": False,
+            "can_view_stats": True,
+            "can_edit": False,
+            "can_manage_users": False,
+            "can_see_tech_support": False
+        }
+    elif "edit" in user_permissions:
+        return {
+            "can_input": True,
+            "can_view_stats": True,
+            "can_edit": True,
+            "can_manage_users": False,
+            "can_see_tech_support": False
+        }
+    elif "view" in user_permissions:
+        return {
+            "can_input": False,
+            "can_view_stats": True,
+            "can_edit": False,
+            "can_manage_users": False,
+            "can_see_tech_support": False
+        }
+    
+    # صلاحيات افتراضية للعرض فقط
     return {
         "can_input": False,
-        "can_view_stats": False,
+        "can_view_stats": True,
         "can_edit": False,
         "can_manage_users": False,
         "can_see_tech_support": False
@@ -866,11 +986,12 @@ with st.sidebar:
         user_fullname = st.session_state.get("user_fullname", username)
         user_role = st.session_state.get("user_role", "مستخدم")
         user_department = st.session_state.get("user_department", "غير محدد")
+        user_role_name = APP_CONFIG["ROLES"].get(user_role, {}).get("name", user_role)
         
         rem = remaining_time(state, username)
         if rem:
             mins, secs = divmod(int(rem.total_seconds()), 60)
-            st.success(f"👋 {user_fullname} | الدور: {user_role} | ⏳ {mins:02d}:{secs:02d}")
+            st.success(f"👋 {user_fullname} | {user_role_name} | ⏳ {mins:02d}:{secs:02d}")
         else:
             logout_action()
 
@@ -1332,10 +1453,10 @@ with main_tabs[2]:
                                 st.rerun()
 
 # -------------------------------
-# Tab 4: إدارة النظام
+# Tab 4: إدارة النظام المتقدمة
 # -------------------------------
 with main_tabs[3]:
-    st.header("👥 إدارة النظام والمستخدمين")
+    st.header("👥 إدارة النظام والمستخدمين المتقدمة")
     
     # التحقق من صلاحيات إدارة النظام
     if user_role != "admin" and "all" not in user_permissions:
@@ -1343,93 +1464,266 @@ with main_tabs[3]:
     else:
         users = load_users()
         
-        st.subheader("📋 المستخدمين الحاليين")
-        if users:
-            user_data = []
-            for username, info in users.items():
-                user_data.append({
-                    "اسم المستخدم": username,
-                    "الاسم الكامل": info.get("full_name", username),
-                    "الدور": info.get("role", "user"),
-                    "القسم": info.get("department", "all"),
-                    "الصلاحيات": ", ".join(info.get("permissions", [])),
-                    "تاريخ الإنشاء": info.get("created_at", "غير معروف")
+        # تبويبات إدارة النظام
+        management_tabs = st.tabs(["📋 إدارة المستخدمين", "⚙ إعدادات الأدوار", "📊 إحصائيات النظام"])
+        
+        # تبويب إدارة المستخدمين
+        with management_tabs[0]:
+            st.subheader("📋 إدارة المستخدمين")
+            
+            # عرض المستخدمين الحاليين
+            st.markdown("### المستخدمين الحاليين")
+            if users:
+                # تحويل بيانات المستخدمين إلى DataFrame
+                user_data = []
+                for username, info in users.items():
+                    role_name = APP_CONFIG["ROLES"].get(info["role"], {}).get("name", info["role"])
+                    user_data.append({
+                        "اسم المستخدم": username,
+                        "الاسم الكامل": info.get("full_name", username),
+                        "الدور": role_name,
+                        "القسم": info.get("department", "غير محدد"),
+                        "الحالة": "🟢 مفعل" if info.get("is_active", True) else "🔴 غير مفعل",
+                        "تاريخ الإنشاء": info.get("created_at", "غير معروف")[:10],
+                        "آخر تعديل": info.get("last_modified", "غير معروف")[:10],
+                        "تم الإنشاء بواسطة": info.get("created_by", "system")
+                    })
+                
+                users_df = pd.DataFrame(user_data)
+                st.dataframe(users_df, use_container_width=True)
+                
+                # إحصائيات سريعة
+                col1, col2, col3, col4 = st.columns(4)
+                active_users = sum(1 for u in users.values() if u.get("is_active", True))
+                total_users = len(users)
+                admin_users = sum(1 for u in users.values() if u.get("role") == "admin")
+                
+                with col1:
+                    st.metric("إجمالي المستخدمين", total_users)
+                with col2:
+                    st.metric("المستخدمين النشطين", active_users)
+                with col3:
+                    st.metric("المسؤولين", admin_users)
+                with col4:
+                    st.metric("المستخدمين المعطلين", total_users - active_users)
+            
+            st.markdown("---")
+            
+            # إضافة مستخدم جديد
+            st.subheader("➕ إضافة مستخدم جديد")
+            
+            with st.form("add_user_form"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    new_username = st.text_input("اسم المستخدم الجديد:*", placeholder="أدخل اسم المستخدم")
+                    new_fullname = st.text_input("الاسم الكامل:*", placeholder="أدخل الاسم الكامل")
+                    new_password = st.text_input("كلمة المرور:*", type="password", placeholder="أدخل كلمة المرور")
+                    confirm_password = st.text_input("تأكيد كلمة المرور:*", type="password", placeholder="أكد كلمة المرور")
+                
+                with col2:
+                    # اختيار الدور
+                    available_roles = list(APP_CONFIG["ROLES"].keys())
+                    role_descriptions = {role: info["name"] for role, info in APP_CONFIG["ROLES"].items()}
+                    selected_role = st.selectbox(
+                        "الدور:*",
+                        options=available_roles,
+                        format_func=lambda x: role_descriptions[x]
+                    )
+                    
+                    # اختيار القسم بناءً على الدور
+                    role_departments = APP_CONFIG["ROLES"][selected_role]["departments"]
+                    if "all" in role_departments:
+                        selected_department = "all"
+                    else:
+                        selected_department = st.selectbox("القسم:*", options=role_departments)
+                    
+                    user_email = st.text_input("البريد الإلكتروني (اختياري):", placeholder="user@belyarn.com")
+                    user_phone = st.text_input("رقم الهاتف (اختياري):", placeholder="0123456789")
+                    is_active = st.checkbox("تفعيل الحساب", value=True)
+                
+                if st.form_submit_button("إضافة المستخدم", type="primary", use_container_width=True):
+                    if not new_username.strip():
+                        st.warning("⚠ يرجى إدخال اسم المستخدم.")
+                    elif not new_fullname.strip():
+                        st.warning("⚠ يرجى إدخال الاسم الكامل.")
+                    elif not new_password.strip():
+                        st.warning("⚠ يرجى إدخال كلمة المرور.")
+                    elif new_password != confirm_password:
+                        st.warning("⚠ كلمتا المرور غير متطابقتين.")
+                    elif new_username in users:
+                        st.warning("⚠ هذا المستخدم موجود بالفعل.")
+                    else:
+                        # إنشاء المستخدم الجديد
+                        users[new_username] = {
+                            "password": new_password,
+                            "role": selected_role,
+                            "department": selected_department,
+                            "permissions": APP_CONFIG["ROLES"][selected_role]["permissions"],
+                            "full_name": new_fullname,
+                            "is_active": is_active,
+                            "email": user_email if user_email.strip() else "",
+                            "phone": user_phone if user_phone.strip() else "",
+                            "created_at": datetime.now().isoformat(),
+                            "last_modified": datetime.now().isoformat(),
+                            "created_by": st.session_state.get("username", "admin")
+                        }
+                        
+                        if auto_save_users(users, f"إضافة المستخدم {new_username}"):
+                            st.rerun()
+            
+            st.markdown("---")
+            
+            # إدارة المستخدمين الحاليين
+            st.subheader("🛠 إدارة المستخدمين الحاليين")
+            
+            if users:
+                user_to_manage = st.selectbox(
+                    "اختر مستخدم للإدارة:",
+                    list(users.keys()),
+                    key="manage_user_select"
+                )
+                
+                if user_to_manage:
+                    user_info = users[user_to_manage]
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("##### معلومات المستخدم:")
+                        st.write(f"*الاسم الكامل:* {user_info.get('full_name', user_to_manage)}")
+                        st.write(f"*الدور:* {APP_CONFIG['ROLES'].get(user_info['role'], {}).get('name', user_info['role'])}")
+                        st.write(f"*القسم:* {user_info.get('department', 'غير محدد')}")
+                        st.write(*الحالة:*** {'🟢 مفعل' if user_info.get('is_active', True) else '🔴 معطل'}")
+                        st.write(f"*تاريخ الإنشاء:* {user_info.get('created_at', 'غير معروف')[:10]}")
+                    
+                    with col2:
+                        st.markdown("##### إجراءات سريعة:")
+                        
+                        # تفعيل/تعطيل المستخدم
+                        current_status = user_info.get('is_active', True)
+                        new_status = not current_status
+                        status_action = "تفعيل" if new_status else "تعطيل"
+                        
+                        if st.button(f"{'🔴' if current_status else '🟢'} {status_action} المستخدم", 
+                                   use_container_width=True, key=f"toggle_{user_to_manage}"):
+                            users[user_to_manage]["is_active"] = new_status
+                            if auto_save_users(users, f"{status_action} المستخدم {user_to_manage}"):
+                                st.rerun()
+                        
+                        # إعادة تعيين كلمة المرور
+                        new_password = st.text_input("كلمة المرور الجديدة:", type="password", 
+                                                   key=f"reset_{user_to_manage}")
+                        if st.button("🔄 إعادة تعيين كلمة المرور", use_container_width=True, 
+                                   key=f"reset_btn_{user_to_manage}"):
+                            if new_password.strip():
+                                users[user_to_manage]["password"] = new_password
+                                if auto_save_users(users, f"إعادة تعيين كلمة مرور {user_to_manage}"):
+                                    st.rerun()
+                            else:
+                                st.warning("⚠ يرجى إدخال كلمة مرور جديدة.")
+                        
+                        # حذف المستخدم (لا يمكن حذف admin أو المستخدم الحالي)
+                        if user_to_manage != "admin" and user_to_manage != st.session_state.get("username"):
+                            if st.button("🗑 حذف المستخدم", type="secondary", use_container_width=True,
+                                       key=f"delete_{user_to_manage}"):
+                                del users[user_to_manage]
+                                if auto_save_users(users, f"حذف المستخدم {user_to_manage}"):
+                                    st.rerun()
+                        else:
+                            st.info("ℹ️ لا يمكن حذف المسؤول الرئيسي أو حسابك الحالي.")
+        
+        # تبويب إعدادات الأدوار
+        with management_tabs[1]:
+            st.subheader("⚙ إعدادات الأدوار والصلاحيات")
+            
+            st.info("""
+            ### 📋 شرح الأدوار والصلاحيات:
+            
+            - *مدير النظام (admin)*: جميع الصلاحيات في جميع الأقسام
+            - *مدير مكبس القطن*: صلاحيات كاملة في قسم مكبس القطن فقط
+            - *مدير الصيانة*: صلاحيات كاملة في قسم CMMS فقط  
+            - *مدير المحطات*: صلاحيات كاملة في قسم محطات الإنتاج فقط
+            - *المحررون*: يمكنهم إدخال وتعديل البيانات في أقسامهم
+            - *المشاهدون*: يمكنهم فقط عرض البيانات في أقسامهم
+            """)
+            
+            # عرض جدول الأدوار
+            roles_data = []
+            for role_id, role_info in APP_CONFIG["ROLES"].items():
+                roles_data.append({
+                    "معرف الدور": role_id,
+                    "اسم الدور": role_info["name"],
+                    "الأقسام": ", ".join(role_info["departments"]),
+                    "الصلاحيات": ", ".join(role_info["permissions"])
                 })
             
-            users_df = pd.DataFrame(user_data)
-            st.dataframe(users_df, use_container_width=True)
-        
-        st.subheader("➕ إضافة مستخدم جديد")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            new_username = st.text_input("اسم المستخدم الجديد:", key="new_username")
-            new_fullname = st.text_input("الاسم الكامل:", key="new_fullname")
-        with col2:
-            new_password = st.text_input("كلمة المرور:", type="password", key="new_password")
-            confirm_password = st.text_input("تأكيد كلمة المرور:", type="password", key="confirm_password")
-        with col3:
-            user_role = st.selectbox("الدور:", ["admin", "data_entry", "editor", "viewer"], key="new_user_role")
-            user_department = st.selectbox("القسم:", ["all", "cotton", "cmms", "production"], key="new_user_department")
-        
-        if st.button("إضافة مستخدم", type="primary", key="add_user_btn"):
-            if not new_username.strip():
-                st.warning("⚠ يرجى إدخال اسم المستخدم.")
-            elif not new_password.strip():
-                st.warning("⚠ يرجى إدخال كلمة المرور.")
-            elif new_password != confirm_password:
-                st.warning("⚠ كلمتا المرور غير متطابقتين.")
-            elif new_username in users:
-                st.warning("⚠ هذا المستخدم موجود بالفعل.")
-            else:
-                # تحديد الصلاحيات بناءً على الدور
-                if user_role == "admin":
-                    permissions_list = ["all"]
-                elif user_role == "data_entry":
-                    permissions_list = ["data_entry"]
-                elif user_role == "editor":
-                    permissions_list = ["view", "edit"]
-                else:  # viewer
-                    permissions_list = ["view_stats"]
-                
-                users[new_username] = {
-                    "password": new_password,
-                    "role": user_role,
-                    "permissions": permissions_list,
-                    "created_at": datetime.now().isoformat(),
-                    "full_name": new_fullname or new_username,
-                    "department": user_department
-                }
-                if save_users(users):
-                    st.success(f"✅ تم إضافة المستخدم '{new_username}' بنجاح.")
-                    st.rerun()
-        
-        st.subheader("🗑 حذف مستخدم")
-        
-        if len(users) > 1:
-            user_to_delete = st.selectbox(
-                "اختر مستخدم للحذف:",
-                [u for u in users.keys() if u != "admin"],
-                key="delete_user_select"
-            )
+            roles_df = pd.DataFrame(roles_data)
+            st.dataframe(roles_df, use_container_width=True)
             
-            col1, col2 = st.columns(2)
+            # توزيع المستخدمين حسب الأدوار
+            st.markdown("### 📊 توزيع المستخدمين حسب الأدوار")
+            role_distribution = {}
+            for user_info in users.values():
+                role = user_info.get("role", "viewer")
+                if role in role_distribution:
+                    role_distribution[role] += 1
+                else:
+                    role_distribution[role] = 1
+            
+            if role_distribution:
+                dist_data = []
+                for role, count in role_distribution.items():
+                    role_name = APP_CONFIG["ROLES"].get(role, {}).get("name", role)
+                    dist_data.append({"الدور": role_name, "عدد المستخدمين": count})
+                
+                dist_df = pd.DataFrame(dist_data)
+                st.dataframe(dist_df, use_container_width=True)
+        
+        # تبويب إحصائيات النظام
+        with management_tabs[2]:
+            st.subheader("📊 إحصائيات النظام")
+            
+            col1, col2, col3 = st.columns(3)
+            
             with col1:
-                confirm_delete = st.checkbox("✅ تأكيد الحذف", key="confirm_user_delete")
+                st.metric("إجمالي المستخدمين", len(users))
+                st.metric("الجلسات النشطة", len([u for u in load_state().values() if u.get("active")]))
+            
             with col2:
-                if st.button("حذف المستخدم", key="delete_user_btn"):
-                    if not confirm_delete:
-                        st.warning("⚠ يرجى تأكيد الحذف أولاً.")
-                    elif user_to_delete == "admin":
-                        st.error("❌ لا يمكن حذف المستخدم admin.")
-                    elif user_to_delete == st.session_state.get("username"):
-                        st.error("❌ لا يمكن حذف حسابك أثناء تسجيل الدخول.")
-                    else:
-                        if user_to_delete in users:
-                            del users[user_to_delete]
-                            if save_users(users):
-                                st.success(f"✅ تم حذف المستخدم '{user_to_delete}' بنجاح.")
-                                st.rerun()
+                # إحصائيات الملفات
+                cotton_file = APP_CONFIG["REPOS"]["cotton"]["LOCAL_FILE"]
+                cmms_file = APP_CONFIG["REPOS"]["cmms"]["LOCAL_FILE"]
+                production_file = APP_CONFIG["REPOS"]["production"]["LOCAL_FILE"]
+                
+                files_exist = {
+                    "مكبس القطن": os.path.exists(cotton_file),
+                    "CMMS": os.path.exists(cmms_file),
+                    "محطات الإنتاج": os.path.exists(production_file)
+                }
+                
+                st.metric("الملفات المحلية", f"{sum(files_exist.values())}/3")
+            
+            with col3:
+                st.metric("مدة الجلسة", f"{APP_CONFIG['SESSION_DURATION_MINUTES']} دقيقة")
+                st.metric("الحد الأقصى للمستخدمين", APP_CONFIG["MAX_ACTIVE_USERS"])
+            
+            # معلومات حول الملفات
+            st.markdown("### 📁 حالة الملفات المحلية")
+            files_status = []
+            for dept, config in APP_CONFIG["REPOS"].items():
+                file_path = config["LOCAL_FILE"]
+                exists = os.path.exists(file_path)
+                size = os.path.getsize(file_path) if exists else 0
+                files_status.append({
+                    "القسم": dept,
+                    "الملف": file_path,
+                    "الحالة": "✅ موجود" if exists else "❌ مفقود",
+                    "الحجم": f"{size / 1024:.1f} KB" if exists else "0 KB"
+                })
+            
+            files_df = pd.DataFrame(files_status)
+            st.dataframe(files_df, use_container_width=True)
 
 # -------------------------------
 # Tab 5: الدعم الفني
@@ -1458,17 +1752,18 @@ with main_tabs[4]:
     
     st.markdown("---")
     st.markdown("### إصدار النظام:")
-    st.markdown("- الإصدار: 4.0 (متكامل)")
+    st.markdown("- الإصدار: 5.0 (المستخدمين المتقدم)")
     st.markdown("- آخر تحديث: 2024")
     st.markdown("- النظام: نظام إدارة بيل يارن المتكامل")
     
     st.success("""
     مميزات النظام المتكامل:
     - ✅ نظام مكبس القطن - إدارة البالات والإنتاج
-    - ✅ نظام CMMS - إدارة صيانة الماكينات
+    - ✅ نظام CMMS - إدارة صيانة الماكينات  
     - ✅ نظام محطات الإنتاج - إدارة المحطات والأقسام
     - ✅ إدارة مستخدمين متقدمة مع صلاحيات لكل قسم
-    - ✅ الحفظ التلقائي على GitHub
+    - ✅ نظام أدوار متكامل (مديرين، محررين، مشاهدين)
+    - ✅ الحفظ التلقائي على GitHub وملفات JSON
     - ✅ دعم كامل للغة العربية
     """)
     
