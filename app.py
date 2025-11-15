@@ -207,15 +207,15 @@ def login_ui():
     st.title(f"{APP_CONFIG['APP_ICON']} تسجيل الدخول - {APP_CONFIG['APP_TITLE']}")
 
     # اختيار المستخدم
-    username_input = st.selectbox("👤 اختر المستخدم", list(users.keys()))
-    password = st.text_input("🔑 كلمة المرور", type="password")
+    username_input = st.selectbox("👤 اختر المستخدم", list(users.keys()), key="username_select")
+    password = st.text_input("🔑 كلمة المرور", type="password", key="password_input")
 
     active_users = [u for u, v in state.items() if v.get("active")]
     active_count = len(active_users)
     st.caption(f"🔒 المستخدمون النشطون الآن: {active_count} / {MAX_ACTIVE_USERS}")
 
     if not st.session_state.logged_in:
-        if st.button("تسجيل الدخول"):
+        if st.button("تسجيل الدخول", key="login_btn"):
             if username_input in users and users[username_input]["password"] == password:
                 if username_input == "admin":
                     pass
@@ -247,7 +247,7 @@ def login_ui():
         else:
             st.warning("⏰ انتهت الجلسة، سيتم تسجيل الخروج.")
             logout_action()
-        if st.button("🚪 تسجيل الخروج"):
+        if st.button("🚪 تسجيل الخروج", key="logout_btn"):
             logout_action()
         return True
 
@@ -516,8 +516,8 @@ def check_machine_status(card_num, current_tons, all_sheets):
         current_tons_series = pd.to_numeric(card_df["Current Tons"], errors='coerce')
         current_tons_series = current_tons_series.dropna()
         if not current_tons_series.empty:
-            actual_current_tons = current_tons_series.iloc[-1]
-            st.success(f"🔄 القيمة الفعلية الحالية من النظام: {actual_current_tons} طن**")
+            actual_current_tons = float(current_tons_series.iloc[-1])  # تحويل إلى float
+            st.success(f*🔄 القيمة الفعلية الحالية من النظام: {actual_current_tons} طن**")
             # تحديث القيمة المدخلة تلقائياً
             current_tons = actual_current_tons
 
@@ -530,17 +530,18 @@ def check_machine_status(card_num, current_tons, all_sheets):
         "اختر نطاق العرض:",
         ("الشريحة الحالية فقط", "كل الشرائح الأقل", "كل الشرائح الأعلى", "نطاق مخصص", "كل الشرائح"),
         horizontal=True,
-        key="view_option"
+        key="view_option_main"
     )
 
     min_range = st.session_state.get("min_range", max(0, current_tons - 500))
     max_range = st.session_state.get("max_range", current_tons + 500)
+    
     if view_option == "نطاق مخصص":
         col1, col2 = st.columns(2)
         with col1:
-            min_range = st.number_input("من (طن):", min_value=0, step=100, value=min_range, key="min_range")
+            min_range = st.number_input("من (طن):", min_value=0, step=100, value=int(min_range), key="min_range_main")
         with col2:
-            max_range = st.number_input("إلى (طن):", min_value=min_range, step=100, value=max_range, key="max_range")
+            max_range = st.number_input("إلى (طن):", min_value=int(min_range), step=100, value=int(max_range), key="max_range_main")
 
     # التحقق من وجود أعمدة Min_Tones و Max_Tones في service_plan_df
     if "Min_Tones" not in service_plan_df.columns or "Max_Tones" not in service_plan_df.columns:
@@ -551,17 +552,17 @@ def check_machine_status(card_num, current_tons, all_sheets):
     try:
         if view_option == "الشريحة الحالية فقط":
             selected_slices = service_plan_df[
-                (service_plan_df["Min_Tones"].fillna(0) <= current_tons) & 
-                (service_plan_df["Max_Tones"].fillna(0) >= current_tons)
+                (pd.to_numeric(service_plan_df["Min_Tones"], errors='coerce').fillna(0) <= current_tons) & 
+                (pd.to_numeric(service_plan_df["Max_Tones"], errors='coerce').fillna(0) >= current_tons)
             ]
         elif view_option == "كل الشرائح الأقل":
-            selected_slices = service_plan_df[service_plan_df["Max_Tones"].fillna(0) <= current_tons]
+            selected_slices = service_plan_df[pd.to_numeric(service_plan_df["Max_Tones"], errors='coerce').fillna(0) <= current_tons]
         elif view_option == "كل الشرائح الأعلى":
-            selected_slices = service_plan_df[service_plan_df["Min_Tones"].fillna(0) >= current_tons]
+            selected_slices = service_plan_df[pd.to_numeric(service_plan_df["Min_Tones"], errors='coerce').fillna(0) >= current_tons]
         elif view_option == "نطاق مخصص":
             selected_slices = service_plan_df[
-                (service_plan_df["Min_Tones"].fillna(0) >= min_range) & 
-                (service_plan_df["Max_Tones"].fillna(0) <= max_range)
+                (pd.to_numeric(service_plan_df["Min_Tones"], errors='coerce').fillna(0) >= min_range) & 
+                (pd.to_numeric(service_plan_df["Max_Tones"], errors='coerce').fillna(0) <= max_range)
             ]
         else:
             selected_slices = service_plan_df.copy()
@@ -775,12 +776,12 @@ with st.sidebar:
 
     st.markdown("---")
     st.write("🔧 أدوات:")
-    if st.button("🔄 تحديث الملف من GitHub"):
+    if st.button("🔄 تحديث الملف من GitHub", key="refresh_github"):
         if fetch_from_github_requests():
             st.rerun()
     
     # زر مسح الكاش
-    if st.button("🗑 مسح الكاش"):
+    if st.button("🗑 مسح الكاش", key="clear_cache"):
         try:
             st.cache_data.clear()
             st.rerun()
@@ -789,7 +790,7 @@ with st.sidebar:
     
     st.markdown("---")
     # زر لإعادة تسجيل الخروج
-    if st.button("🚪 تسجيل الخروج"):
+    if st.button("🚪 تسجيل الخروج", key="sidebar_logout"):
         logout_action()
 
 # تحميل الشيتات (عرض وتحليل)
@@ -828,9 +829,69 @@ with tabs[0]:
         with col1:
             card_num = st.number_input("رقم الماكينة:", min_value=1, step=1, key="card_num_main")
         with col2:
-            current_tons = st.number_input("عدد الأطنان الحالية:", min_value=0, step=100, key="current_tons_main")
+            current_tons = st.number_input("عدد الأطنان الحالية:", min_value=0, step=100, key="current_tons_main", value=0)
 
-        if st.button("عرض الحالة"):
+        # قسم العداد المنفصل - محدث
+        st.markdown("---")
+        st.subheader("🔢 عداد الإنتاج الحالي")
+        
+        card_sheet_name = f"Card{card_num}"
+        if card_sheet_name in all_sheets:
+            card_df = all_sheets[card_sheet_name]
+            
+            # البحث عن آخر قيمة لـ Current Tons
+            current_counter_value = 0.0
+            if "Current Tons" in card_df.columns:
+                tons_series = pd.to_numeric(card_df["Current Tons"], errors='coerce')
+                tons_series = tons_series.dropna()
+                if not tons_series.empty:
+                    current_counter_value = float(tons_series.iloc[-1])  # تحويل إلى float
+            
+            # عرض العداد بشكل مميز
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 20px; border-radius: 10px; text-align: center; color: white;">
+                <h3 style="margin: 0; font-size: 18px;">العداد الحالي</h3>
+                <h1 style="margin: 10px 0; font-size: 48px; font-weight: bold;">{current_counter_value:,.2f}</h1>
+                <p style="margin: 0; font-size: 16px;">طن</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # معلومات إضافية
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(
+                    label="بالكيلوجرام",
+                    value=f"{(current_counter_value * 1000):,.0f}",
+                    help="إجمالي الكيلوجرامات المنتجة"
+                )
+            with col2:
+                # حساب نسبة الإنتاج (افتراضي أن السعة القصوى 5000 طن)
+                max_capacity = 5000
+                production_percentage = (current_counter_value / max_capacity) * 100 if max_capacity > 0 else 0
+                st.metric(
+                    label="نسبة الإنتاج",
+                    value=f"{production_percentage:.1f}%",
+                    delta=f"من {max_capacity} طن"
+                )
+            with col3:
+                status = "🟢 نشط" if current_counter_value > 0 else "⚪ متوقف"
+                st.metric(
+                    label="الحالة",
+                    value=status,
+                    help="حالة الماكينة بناءً على الإنتاج"
+                )
+            
+            # شريط تقدم للإنتاج
+            st.progress(float(production_percentage / 100))  # تحويل إلى float
+            
+            # ملاحظة مهمة
+            st.info("💡 *ملاحظة:* العداد يبدأ من قيمة الإنتاج الإضافي التي تدخلها في تبويب 'عداد السرعة والإنتاج'")
+            
+        else:
+            st.info("⚠ لم يتم العثور على بيانات لهذه الماكينة")
+
+        if st.button("عرض الحالة", key="show_status_main"):
             st.session_state["show_results"] = True
 
         if st.session_state.get("show_results", False):
@@ -996,8 +1057,8 @@ if permissions["can_edit"] and len(tabs) > 1:
                 sheet_name_col = st.selectbox("اختر الشيت لإضافة عمود:", list(sheets_edit.keys()), key="add_col_sheet")
                 df_col = sheets_edit[sheet_name_col].astype(str)
                 
-                new_col_name = st.text_input("اسم العمود الجديد:")
-                default_value = st.text_input("القيمة الافتراضية لكل الصفوف (اختياري):", "")
+                new_col_name = st.text_input("اسم العمود الجديد:", key="new_col_name")
+                default_value = st.text_input("القيمة الافتراضية لكل الصفوف (اختياري):", "", key="default_value")
 
                 if st.button("💾 إضافة العمود الجديد", key=f"add_col_{sheet_name_col}"):
                     if new_col_name:
@@ -1027,8 +1088,8 @@ if permissions["can_edit"] and len(tabs) > 1:
                 st.dataframe(df_del, use_container_width=True)
 
                 st.markdown("### ✏ اختر الصفوف التي تريد حذفها")
-                rows_to_delete = st.text_input("أدخل أرقام الصفوف مفصولة بفاصلة (مثلاً: 0,2,5):")
-                confirm_delete = st.checkbox("✅ أؤكد أني أريد حذف هذه الصفوف بشكل نهائي")
+                rows_to_delete = st.text_input("أدخل أرقام الصفوف مفصولة بفاصلة (مثلاً: 0,2,5):", key="rows_to_delete")
+                confirm_delete = st.checkbox("✅ أؤكد أني أريد حذف هذه الصفوف بشكل نهائي", key="confirm_delete")
 
                 if st.button("🗑 تنفيذ الحذف", key=f"delete_rows_{sheet_name_del}"):
                     if not rows_to_delete.strip():
@@ -1058,7 +1119,7 @@ if permissions["can_edit"] and len(tabs) > 1:
                             st.error(f"حدث خطأ أثناء الحذف: {e}")
 
             # -------------------------------
-            # Tab 5: عداد السرعة والإنتاج - التبويب الجديد
+            # Tab 5: عداد السرعة والإنتاج - التبويب الجديد المحسن
             # -------------------------------
             with tab5:
                 st.header("⚡ عداد السرعة والإنتاج الفعلي")
@@ -1090,17 +1151,61 @@ if permissions["can_edit"] and len(tabs) > 1:
                         card_df = sheets_edit[selected_card]
                         
                         # البحث عن آخر قيمة لـ Current Tons
-                        current_tons_value = 0
+                        current_tons_value = 0.0
                         if "Current Tons" in card_df.columns:
                             # أخذ آخر قيمة غير فارغة
                             tons_series = pd.to_numeric(card_df["Current Tons"], errors='coerce')
                             tons_series = tons_series.dropna()
                             if not tons_series.empty:
-                                current_tons_value = tons_series.iloc[-1]
+                                current_tons_value = float(tons_series.iloc[-1])  # تحويل إلى float
                         
                         st.info(f"*عدد الأطنان الحالي للماكينة: {current_tons_value} طن*")
                         
-                        # إدخال بيانات الإنتاج
+                        # قسم تعيين قيمة البدء
+                        st.subheader("🎯 تعيين قيمة بداية العد")
+                        st.markdown("*أدخل القيمة التي تريد أن يبدأ منها العداد:*")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            start_count_value = st.number_input(
+                                "قيمة بداية العد (طن):",
+                                min_value=0.0,  # استخدام float بدلاً من int
+                                value=float(current_tons_value),  # تحويل القيمة إلى float
+                                step=10.0,
+                                help="القيمة التي سيبدأ منها العداد الجديد",
+                                key="start_count_value"  # إضافة key فريد
+                            )
+                        
+                        with col2:
+                            if st.button("🚀 تعيين قيمة البدء", type="primary", key="set_start_value"):
+                                updated_df = card_df.copy()
+                                if "Current Tons" in updated_df.columns:
+                                    # تحديث آخر صف به قيمة
+                                    tons_mask = pd.to_numeric(updated_df["Current Tons"], errors='coerce').notna()
+                                    if tons_mask.any():
+                                        last_idx = tons_mask[tons_mask].index[-1]
+                                        updated_df.at[last_idx, "Current Tons"] = float(start_count_value)  # تحويل إلى float
+                                    else:
+                                        # إذا لم توجد أي قيم، نضيف صفاً جديداً
+                                        new_row = {"Current Tons": float(start_count_value)}  # تحويل إلى float
+                                        for col in updated_df.columns:
+                                            if col != "Current Tons":
+                                                new_row[col] = ""
+                                        new_row_df = pd.DataFrame([new_row])
+                                        updated_df = pd.concat([updated_df, new_row_df], ignore_index=True)
+                                
+                                sheets_edit[selected_card] = updated_df.astype(object)
+                                
+                                # حفظ تلقائي في GitHub
+                                new_sheets = auto_save_to_github(
+                                    sheets_edit,
+                                    f"تعيين بداية العد لـ {selected_card}: {start_count_value} طن"
+                                )
+                                if new_sheets is not None:
+                                    sheets_edit = new_sheets
+                                    st.rerun()
+                        
+                        # إدخال بيانات الإنتاج - معدل للكيلوجرام/ساعة
                         st.subheader("🔄 تحديث الإنتاج")
                         col1, col2, col3 = st.columns(3)
                         
@@ -1111,32 +1216,48 @@ if permissions["can_edit"] and len(tabs) > 1:
                                 max_value=24.0,
                                 value=8.0,
                                 step=0.5,
-                                help="عدد الساعات التي عملت فيها الماكينة"
+                                help="عدد الساعات التي عملت فيها الماكينة",
+                                key="operating_hours"
                             )
                         
                         with col2:
                             machine_speed = st.number_input(
-                                "سرعة الماكينة (طن/ساعة):",
+                                "سرعة الماكينة (كجم/ساعة):",  # إبقاء السرعة بالكيلوجرام/ساعة
                                 min_value=0.0,
                                 value=85.0,
                                 step=1.0,
-                                help="سرعة إنتاج الماكينة بالطن في الساعة"
+                                help="سرعة إنتاج الماكينة بالكيلوجرام في الساعة",
+                                key="machine_speed_kg"
                             )
                         
                         with col3:
                             additional_production = st.number_input(
-                                "إنتاج إضافي (طن):",
+                                "إنتاج إضافي (طن):",  # الإنتاج الإضافي بالطن
                                 min_value=0.0,
                                 value=0.0,
                                 step=10.0,
-                                help="أي إنتاج إضافي غير محسوب بالسرعة"
+                                help="الإنتاج الإضافي الذي سيبدأ منه العداد (بالطن)",
+                                key="additional_production"
                             )
                         
-                        # حساب الإنتاج الجديد
-                        new_production = (operating_hours * machine_speed) + additional_production
-                        new_total_tons = current_tons_value + new_production
+                        # حساب الإنتاج الجديد - تحويل الكيلوجرام إلى طن
+                        # 1 طن = 1000 كجم
+                        production_from_speed_kg = operating_hours * machine_speed  # إنتاج السرعة بالكجم
+                        production_from_speed_ton = production_from_speed_kg / 1000  # تحويل إلى طن
                         
-                        st.success(f"*الإنتاج المضاف: {new_production:.2f} طن*")
+                        # الإنتاج الإضافي (بالطن)
+                        total_additional_ton = additional_production
+                        
+                        # الإنتاج الكلي المضاف
+                        total_new_production_ton = production_from_speed_ton + total_additional_ton
+                        
+                        # القيمة الجديدة للعداد (تبدأ من الإنتاج الإضافي + إنتاج السرعة)
+                        new_total_tons = total_additional_ton + production_from_speed_ton
+                        
+                        # عرض النتائج
+                        st.success(f"*الإنتاج من السرعة: {production_from_speed_kg:,.0f} كجم ({production_from_speed_ton:.2f} طن)*")
+                        st.success(f"*الإنتاج الإضافي (بداية العد): {total_additional_ton:.2f} طن*")
+                        st.success(f"*إجمالي الإنتاج المضاف: {total_new_production_ton:.2f} طن*")
                         st.success(f"*إجمالي الأطنان الجديد: {new_total_tons:.2f} طن*")
                         
                         # خيارات التحديث
@@ -1148,27 +1269,26 @@ if permissions["can_edit"] and len(tabs) > 1:
                                 "إضافة كحدث جديد مع التاريخ",
                                 "تحديث القيمة الحالية فقط"
                             ],
-                            key="update_method"
+                            key="update_method_speed"
                         )
                         
-                        if st.button("💾 تحديث بيانات الإنتاج", type="primary"):
+                        if st.button("💾 تحديث بيانات الإنتاج", type="primary", key="update_production"):
                             if update_method == "إضافة كحدث جديد مع التاريخ":
                                 # إنشاء صف جديد
                                 new_row = {}
                                 
                                 # نسخ بيانات الأعمدة الأساسية
-                                base_columns = ["Min_Tones", "Max_Tones", "Service", "Tones", "Date"]
                                 for col in card_df.columns:
-                                    if col in base_columns:
+                                    if col in ["Min_Tones", "Max_Tones", "Service", "Tones", "Date"]:
                                         new_row[col] = ""
                                     elif col == "Current Tons":
-                                        new_row[col] = new_total_tons
+                                        new_row[col] = float(new_total_tons)  # تحويل إلى float
                                     elif col == "Tones":
-                                        new_row[col] = f"+{new_production:.2f}"
+                                        new_row[col] = f"+{total_new_production_ton:.2f} طن"
                                     elif col == "Date":
                                         new_row[col] = datetime.now().strftime("%Y-%m-%d %H:%M")
                                     elif col == "Event":
-                                        new_row[col] = f"تحديث إنتاجي: {operating_hours}h @ {machine_speed}t/h"
+                                        new_row[col] = f"تحديث إنتاجي: {operating_hours}h @ {machine_speed}kg/h + {additional_production}طن بداية"
                                     else:
                                         new_row[col] = ""
                                 
@@ -1183,10 +1303,10 @@ if permissions["can_edit"] and len(tabs) > 1:
                                     tons_mask = pd.to_numeric(updated_df["Current Tons"], errors='coerce').notna()
                                     if tons_mask.any():
                                         last_idx = tons_mask[tons_mask].index[-1]
-                                        updated_df.at[last_idx, "Current Tons"] = new_total_tons
+                                        updated_df.at[last_idx, "Current Tons"] = float(new_total_tons)  # تحويل إلى float
                                     else:
                                         # إذا لم توجد أي قيم، نضيف صفاً جديداً
-                                        new_row = {"Current Tons": new_total_tons}
+                                        new_row = {"Current Tons": float(new_total_tons)}  # تحويل إلى float
                                         for col in updated_df.columns:
                                             if col != "Current Tons":
                                                 new_row[col] = ""
@@ -1198,62 +1318,11 @@ if permissions["can_edit"] and len(tabs) > 1:
                             # حفظ تلقائي في GitHub
                             new_sheets = auto_save_to_github(
                                 sheets_edit,
-                                f"تحديث إنتاج {selected_card}: {new_production:.2f} طن → {new_total_tons:.2f} طن"
+                                f"تحديث إنتاج {selected_card}: بداية {additional_production}طن + {production_from_speed_ton:.2f}طن سرعة → {new_total_tons:.2f}طن"
                             )
                             if new_sheets is not None:
                                 sheets_edit = new_sheets
                                 st.rerun()
-                        
-                        # عرض سجل الإنتاج - معدل للتحقق من وجود الأعمدة
-                        st.subheader("📈 سجل الإنتاج")
-                        if "Current Tons" in card_df.columns:
-                            # تحديد الأعمدة المتاحة لعرضها
-                            available_columns = []
-                            for col in ["Date", "Tones", "Current Tons", "Event"]:
-                                if col in card_df.columns:
-                                    available_columns.append(col)
-                            
-                            if available_columns:
-                                production_history = card_df[available_columns].copy()
-                                production_history = production_history.dropna(subset=["Current Tons"])
-                                production_history["Current Tons"] = pd.to_numeric(production_history["Current Tons"], errors='coerce')
-                                production_history = production_history.dropna(subset=["Current Tons"])
-                                
-                                if not production_history.empty:
-                                    st.dataframe(
-                                        production_history.sort_values("Current Tons", ascending=False),
-                                        use_container_width=True
-                                    )
-                                    
-                                    # رسم بياني مبسط للتطور
-                                    try:
-                                        chart_data = production_history[["Current Tons"]].copy()
-                                        
-                                        # إذا كان عمود التاريخ متاحاً، استخدمه كمؤشر
-                                        if "Date" in production_history.columns:
-                                            chart_data["Date"] = pd.to_datetime(production_history["Date"], errors='coerce')
-                                            chart_data = chart_data.dropna(subset=["Date"])
-                                            chart_data = chart_data.sort_values("Date")
-                                            if not chart_data.empty:
-                                                st.line_chart(
-                                                    chart_data.set_index("Date")["Current Tons"],
-                                                    use_container_width=True
-                                                )
-                                        else:
-                                            # إذا لم يكن هناك تاريخ، استخدم الفهرس
-                                            chart_data.index = range(len(chart_data))
-                                            st.line_chart(
-                                                chart_data["Current Tons"],
-                                                use_container_width=True
-                                            )
-                                    except Exception as e:
-                                        st.warning(f"⚠ لا يمكن عرض الرسم البياني: {e}")
-                                else:
-                                    st.info("لا توجد بيانات سابقة للإنتاج.")
-                            else:
-                                st.info("لا توجد أعمدة متاحة لعرض سجل الإنتاج.")
-                        else:
-                            st.info("لا يوجد عمود 'Current Tons' في شيت الماكينة.")
 
 # -------------------------------
 # Tab: إدارة المستخدمين - للمسؤول فقط
@@ -1288,11 +1357,11 @@ if permissions["can_manage_users"] and len(tabs) > 2:
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            new_username = st.text_input("اسم المستخدم الجديد:")
+            new_username = st.text_input("اسم المستخدم الجديد:", key="new_username")
         with col2:
-            new_password = st.text_input("كلمة المرور:", type="password")
+            new_password = st.text_input("كلمة المرور:", type="password", key="new_password")
         with col3:
-            user_role = st.selectbox("الدور:", ["admin", "editor", "viewer"])
+            user_role = st.selectbox("الدور:", ["admin", "editor", "viewer"], key="user_role")
         
         if st.button("إضافة مستخدم", key="add_user"):
             if not new_username.strip() or not new_password.strip():
