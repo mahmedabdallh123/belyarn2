@@ -217,6 +217,8 @@ def logout_action():
 def login_ui():
     users = load_users()
     state = cleanup_sessions(load_state())
+    
+    # تهيئة session_state إذا لم تكن موجودة
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
         st.session_state.username = None
@@ -260,7 +262,7 @@ def login_ui():
         return False
     else:
         username = st.session_state.username
-        user_fullname = st.session_state.user_fullname
+        user_fullname = st.session_state.get("user_fullname", username)  # استخدام get للسلامة
         user_role = st.session_state.user_role
         st.success(f"✅ مسجل الدخول كـ: {user_fullname} ({user_role})")
         rem = remaining_time(state, username)
@@ -859,9 +861,12 @@ with st.sidebar:
     else:
         state = cleanup_sessions(load_state())
         username = st.session_state.username
-        user_fullname = st.session_state.user_fullname
-        user_role = st.session_state.user_role
-        user_department = st.session_state.user_department
+        
+        # استخدام get() للسلامة لتجنب AttributeError
+        user_fullname = st.session_state.get("user_fullname", username)
+        user_role = st.session_state.get("user_role", "مستخدم")
+        user_department = st.session_state.get("user_department", "غير محدد")
+        
         rem = remaining_time(state, username)
         if rem:
             mins, secs = divmod(int(rem.total_seconds()), 60)
@@ -906,6 +911,7 @@ with st.sidebar:
     
     # معلومات النظام
     st.header("ℹ معلومات النظام")
+    user_department = st.session_state.get("user_department", "غير محدد")
     st.info(f"القسم: {user_department}")
     
     st.markdown("---")
