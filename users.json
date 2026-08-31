@@ -1,0 +1,204 @@
+{
+    "admin": {
+        "password": "1234",
+        "permissions": {
+            "all_sections": true
+        },
+        "role": "admin",
+        "sections_permissions": {}
+    },
+    "belyarn": {
+        "password": "00000",
+        "permissions": {
+            "all_sections": false
+        },
+        "role": "viewer",
+        "sections_permissions": {
+            "البرم": [
+                "view"
+            ],
+            "التفتيح": [
+                "view"
+            ],
+            "الضواغط": [
+                "view"
+            ],
+            "الغزل": [
+                "view"
+            ],
+            "الكرد": [
+                "view"
+            ],
+            "الكهرباء": [
+                "view"
+            ],
+            "المحطات": [
+                "view"
+            ],
+            "المكبس": [
+                "view"
+            ],
+            "تمشيط": [
+                "view"
+            ],
+            "سحب اول": [
+                "view"
+            ],
+            "سحب ثاني": [
+                "view"
+            ],
+            "محطه تحليه المياه": [
+                "view"
+            ],
+            "ملفات": [
+                "view"
+            ]
+        }
+    },
+    "مدير_صيانة": {
+        "password": "12345",
+        "permissions": {
+            "all_sections": true
+        },
+        "role": "admin",
+        "sections_permissions": {}
+    },
+    "مشرف_التمشيط": {
+        "password": "1234567",
+        "permissions": {
+            "all_sections": false
+        },
+        "role": "viewer",
+        "sections_permissions": {
+            "البرم": [],
+            "التفتيح": [],
+            "الضواغط": [],
+            "الغزل": [],
+            "الكرد": [],
+            "الكهرباء": [],
+            "المحطات": [],
+            "المكبس": [],
+            "تمشيط": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ],
+            "سحب اول": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ],
+            "سحب ثاني": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ],
+            "محطه تحليه المياه": [],
+            "ملفات": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ]
+        }
+    },
+    "مشرف_الغزل": {
+        "password": "123456789",
+        "permissions": {
+            "all_sections": false
+        },
+        "role": "viewer",
+        "sections_permissions": {
+            "البرم": [],
+            "التفتيح": [],
+            "الضواغط": [],
+            "الغزل": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ],
+            "الكرد": [],
+            "الكهرباء": [],
+            "المحطات": [],
+            "المكبس": [],
+            "تمشيط": [],
+            "سحب اول": [],
+            "سحب ثاني": [],
+            "محطه تحليه المياه": [],
+            "ملفات": []
+        }
+    },
+    "مشرف_المكابس": {
+        "password": "2222",
+        "permissions": {
+            "all_sections": false
+        },
+        "role": "viewer",
+        "sections_permissions": {
+            "البرم": [],
+            "التفتيح": [],
+            "الضواغط": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ],
+            "الغزل": [],
+            "الكرد": [],
+            "الكهرباء": [],
+            "المحطات": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ],
+            "المكبس": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ],
+            "تمشيط": [],
+            "سحب اول": [],
+            "سحب ثاني": [],
+            "محطه تحليه المياه": [],
+            "ملفات": []
+        }
+    },
+    "مشرف_تحضيرات": {
+        "password": "5555",
+        "permissions": {
+            "all_sections": false
+        },
+        "role": "viewer",
+        "sections_permissions": {
+            "البرم": [],
+            "التفتيح": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ],
+            "الضواغط": [],
+            "الغزل": [],
+            "الكرد": [
+                "view",
+                "edit",
+                "add_event",
+                "manage_machines"
+            ],
+            "الكهرباء": [],
+            "المحطات": [],
+            "المكبس": [],
+            "تمشيط": [],
+            "سحب اول": [],
+            "سحب ثاني": [],
+            "محطه تحليه المياه": [],
+            "ملفات": []
+        }
+    }
+}
