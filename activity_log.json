@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "timestamp": "2026-08-31T15:56:23.765364",
+    "username": "admin",
+    "action_type": "delete_section",
+    "details": "تم حذف القسم 'Sheet1' وقطع الغيار التابعة له",
+    "section": "Sheet1"
+  }
+]
